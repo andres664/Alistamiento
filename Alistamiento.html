@@ -1,0 +1,2880 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Alistamiento Dislicores</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --pr:#1a1a1a;--pr-d:#000000;--pr-l:#f5f0e8;
+  --gold:#c9a84c;--gold-d:#a8873a;--gold-l:#fdf6e3;
+  --ok:#16a34a;--ok-l:#f0fdf4;
+  --wa:#d97706;--wa-l:#fffbeb;
+  --er:#dc2626;--er-l:#fef2f2;
+  --bg:#fafaf7;--surf:#ffffff;--bord:#e8e0d0;
+  --txt:#1a1a1a;--mut:#6b6b6b;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+.app{max-width:520px;margin:0 auto;padding-bottom:80px}
+/* Header */
+.hdr{background:var(--pr);color:#fff;padding:13px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 3px 0 var(--gold),0 4px 12px rgba(0,0,0,.4)}
+.hdr h1{font-size:16px;font-weight:700;flex:1}
+.hdr-sub{font-size:11px;opacity:.8}
+.hdr-btn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;white-space:nowrap}
+/* Cards */
+.card{background:var(--surf);border-radius:14px;padding:16px;margin:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 16px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s;width:100%;margin-top:8px}
+.btn-pr{background:var(--pr);color:var(--gold)}.btn-pr:active{background:var(--pr-d)}
+.btn-ok{background:var(--ok);color:#fff}
+.btn-er{background:var(--er);color:#fff}
+.btn-sec{background:#f3f4f6;color:var(--txt)}
+.btn-wa{background:var(--wa);color:#fff}
+.btn-sm{padding:6px 12px;font-size:12px;width:auto;margin-top:0}
+.file-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;color:#fff;width:100%;margin-top:8px}
+.file-btn input{display:none}
+/* Loader */
+#loader{position:fixed;inset:0;background:rgba(255,255,255,.92);z-index:999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.spin{width:40px;height:40px;border:4px solid var(--bord);border-top-color:var(--pr);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 22px;border-radius:12px;font-size:14px;font-weight:600;color:#fff;z-index:1001;display:none;max-width:380px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25);line-height:1.4}
+/* List items */
+.list-item{display:flex;align-items:center;gap:12px;background:var(--surf);border-radius:12px;padding:14px;margin:7px 14px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:background .1s}
+.list-item:active{background:var(--pr-l)}
+.li-icon{font-size:24px;min-width:32px;text-align:center}
+.li-body{flex:1;min-width:0}
+.li-name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-sub{font-size:12px;color:var(--mut);margin-top:2px}
+.li-arr{color:var(--mut);font-size:20px}
+/* Badges */
+.badge{display:inline-flex;align-items:center;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;white-space:nowrap}
+.b-pr{background:var(--gold);color:#1a1a1a;font-weight:700}
+.b-ok{background:var(--ok);color:#fff}
+.b-wa{background:var(--wa);color:#fff}
+.b-er{background:var(--er);color:#fff}
+.b-gray{background:#e5e7eb;color:var(--txt)}
+.b-vio{background:#7c3aed;color:#fff}
+/* Progress */
+.prog-bg{background:var(--bord);border-radius:4px;height:7px;overflow:hidden;margin:5px 0}
+.prog-fill{background:var(--gold);height:100%;border-radius:4px;transition:width .3s}
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.modal{background:var(--surf);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-hdl{width:36px;height:4px;background:var(--bord);border-radius:2px;margin:0 auto 14px}
+/* Input */
+.inp{width:100%;padding:11px 14px;border:2px solid var(--bord);border-radius:10px;font-size:15px;margin:5px 0;outline:none;transition:border-color .15s;background:#fff}
+.inp:focus{border-color:var(--gold)}
+.inp-label{font-size:12px;font-weight:600;color:var(--mut);margin-top:8px;display:block}
+/* Table */
+.tbl-wrap{overflow-x:auto;margin-top:8px;border-radius:10px;border:1px solid var(--bord)}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{background:var(--pr);color:var(--gold);padding:8px 10px;text-align:left;font-size:11px;white-space:nowrap;position:sticky;top:0}
+.tbl td{padding:7px 10px;border-bottom:1px solid var(--bord);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:nth-child(even) td{background:#fafafa}
+.tbl tr:hover td{background:var(--pr-l)}
+.edit-inp{width:100%;padding:3px 6px;border:1px solid var(--bord);border-radius:4px;font-size:12px;outline:none;background:#fff}
+.edit-inp:focus{border-color:var(--gold)}
+/* Toggle */
+.tog{position:relative;display:inline-block;width:40px;height:22px}
+.tog input{opacity:0;width:0;height:0}
+.tog-sl{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:22px;transition:.3s}
+.tog-sl:before{content:"";position:absolute;width:16px;height:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+input:checked+.tog-sl{background:var(--pr)}
+input:checked+.tog-sl:before{transform:translateX(18px)}
+/* Tabs */
+.tabs{display:flex;background:var(--surf);border-bottom:2px solid var(--bord);position:sticky;top:50px;z-index:90}
+.tab{flex:1;padding:10px 6px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;color:var(--mut);transition:all .15s}
+.tab.on{color:var(--pr);border-bottom:2px solid var(--pr);margin-bottom:-2px}
+/* Item card alistamiento */
+.item-card{background:var(--surf);margin:6px 12px;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.item-card.done{opacity:.6}
+.ic-main{padding:12px;cursor:pointer}
+.ic-ref{font-size:11px;color:var(--mut);font-weight:600}
+.ic-desc{font-size:14px;font-weight:700;margin:2px 0 6px}
+.ic-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ic-bar{height:4px;transition:width .3s}
+/* Kit breakdown */
+.kit-box{background:#fdf4ff;border:1px solid #d8b4fe;border-radius:8px;padding:8px 10px;margin:6px 0 2px;font-size:12px}
+.kit-row{display:flex;justify-content:space-between;padding:2px 0;color:#6d28d9}
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;padding:8px 14px;background:var(--surf);border-bottom:1px solid var(--bord);overflow-x:auto}
+.filter-bar input,.filter-bar select{padding:6px 10px;border:1px solid var(--bord);border-radius:8px;font-size:12px;outline:none;min-width:120px;background:#fff}
+.filter-bar input:focus,.filter-bar select:focus{border-color:var(--pr)}
+/* Summary */
+.sum-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bord);font-size:13px}
+/* FAB */
+.fab{position:fixed;bottom:20px;right:20px;width:52px;height:52px;border-radius:50%;background:var(--pr);color:#fff;font-size:22px;display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(109,40,217,.4);z-index:150;border:none}
+/* Role cards */
+.role-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px}
+.role-card{background:var(--surf);border:2px solid var(--bord);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:all .15s}
+.role-card:active,.role-card.sel{border-color:var(--gold);background:var(--gold-l)}
+.role-ico{font-size:28px;margin-bottom:5px}
+.role-lbl{font-size:12px;font-weight:700}
+/* Stat boxes */
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 14px}
+.stat-box{background:var(--surf);border-radius:12px;padding:12px 8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.stat-n{font-size:22px;font-weight:800}
+.stat-l{font-size:11px;color:var(--mut);margin-top:2px}
+/* Dashboard */
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px}
+.dash-card{background:var(--surf);border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.dash-card-full{background:var(--surf);border-radius:14px;padding:14px;margin:0 14px 10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.dash-title{font-size:12px;font-weight:700;color:var(--mut);margin-bottom:10px;text-transform:uppercase}
+.dash-big{font-size:36px;font-weight:900;color:var(--gold)}
+.dash-sub{font-size:12px;color:var(--mut)}
+/* Barra zona dashboard */
+.zona-bar{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bord)}
+.zona-bar-name{font-size:12px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zona-bar-pct{font-size:11px;color:var(--mut);min-width:30px;text-align:right}
+.zona-bar-bg{flex:2;background:var(--bord);border-radius:4px;height:6px;overflow:hidden}
+.zona-bar-fill{height:100%;border-radius:4px;background:var(--gold);transition:width .4s}
+/* Alistador en vivo */
+.live-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bord)}
+.live-dot{width:10px;height:10px;border-radius:50%;background:var(--ok);flex-shrink:0;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.live-name{font-weight:700;font-size:13px;flex:1}
+.live-zona{font-size:11px;color:var(--mut)}
+/* Timer */
+.timer-box{background:var(--pr);color:var(--gold);padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+/* Historial */
+.hist-item{background:var(--surf);border-radius:12px;padding:12px 14px;margin:6px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.hist-date{font-size:11px;color:var(--mut)}
+.hist-title{font-weight:700;font-size:14px;margin:2px 0}
+/* Búsqueda rápida */
+.search-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:none;flex-direction:column}
+.search-box{background:var(--surf);padding:14px;border-bottom:3px solid var(--gold)}
+.search-results{flex:1;overflow-y:auto;padding:8px 0}
+.search-row{padding:12px 16px;border-bottom:1px solid var(--bord);cursor:pointer}
+.search-row:active{background:var(--pr-l)}
+/* Validación supervisor */
+.valid-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700}
+.valid-ok{background:var(--ok-l);color:var(--ok)}
+.valid-pend{background:var(--wa-l);color:var(--wa)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div id="loader"><div class="spin"></div><div id="ldMsg">Cargando...</div></div>
+  <div id="toast"></div>
+  <div id="fab" class="fab" onclick="fabAct()">📊</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIGURACIÓN — pon tus credenciales aquí
+// ═══════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://ubfbbmoeblpoujgtgglm.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViZmJibW9lYmxwb3VqZ3RnZ2xtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjcxNzIsImV4cCI6MjA5NTkwMzE3Mn0.CcS7fG0-Hiw5EkJ5qsRzT6sQ5RxyBawWjP69YyUeFPI';
+// ═══════════════════════════════════════════════════════════
+
+// ── Supabase client ─────────────────────────────────────────
+function mkSB(url, key) {
+  const H = { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const base = url.replace(/\/+$/, '');
+
+  async function req(path, opts = {}) {
+    // Fetch ALL rows by paginating with Range header (Supabase default limit = 1000)
+    const isSelect = !opts.method || opts.method === 'GET';
+    const pageSize = 1000;
+    let allRows = null;
+
+    if (isSelect) {
+      let offset = 0;
+      allRows = [];
+      while (true) {
+        const rangeHdr = { 'Range': offset + '-' + (offset + pageSize - 1), 'Range-Unit': 'items', 'Prefer': 'count=none' };
+        const r = await fetch(base + '/rest/v1/' + path, { ...opts, headers: { ...H, ...(opts.xh || {}), ...rangeHdr } });
+        const t = await r.text();
+        let j; try { j = t ? JSON.parse(t) : []; } catch { j = []; }
+        if (!r.ok) {
+          const m = (j && j.message) ? j.message : ('HTTP ' + r.status + (r.status === 404 ? ' — verifica que las tablas existen en Supabase' : ''));
+          throw new Error(m);
+        }
+        if (!Array.isArray(j) || j.length === 0) break;
+        allRows = allRows.concat(j);
+        if (j.length < pageSize) break;
+        offset += pageSize;
+      }
+      return allRows;
+    }
+
+    // Non-select (INSERT, UPDATE, DELETE, UPSERT)
+    const r = await fetch(base + '/rest/v1/' + path, { ...opts, headers: { ...H, ...(opts.xh || {}) } });
+    const t = await r.text();
+    let j; try { j = t ? JSON.parse(t) : []; } catch { j = []; }
+    if (!r.ok) {
+      const m = (j && j.message) ? j.message : ('HTTP ' + r.status + (r.status === 404 ? ' — verifica que las tablas existen en Supabase' : ''));
+      throw new Error(m);
+    }
+    return j;
+  }
+
+  function qb(tbl) {
+    let cols = '*', filters = [], ord = null, lim = null;
+    const b = {
+      select(c) { cols = c || '*'; return b; },
+      eq(c, v) { filters.push(c + '=eq.' + encodeURIComponent(v)); return b; },
+      neq(c, v) { filters.push(c + '=neq.' + encodeURIComponent(v)); return b; },
+      in(c, arr) { filters.push(c + '=in.(' + arr.map(x => encodeURIComponent(x)).join(',') + ')'); return b; },
+      ilike(c, v) { filters.push(c + '=ilike.' + encodeURIComponent(v)); return b; },
+      order(c, asc = true) { ord = c + (asc ? '.asc' : '.desc'); return b; },
+      limit(n) { lim = n; return b; },
+      get() {
+        let p = tbl + '?select=' + cols;
+        filters.forEach(f => { p += '&' + f; });
+        if (ord) p += '&order=' + ord;
+        if (lim) p += '&limit=' + lim;
+        return req(p);
+      },
+      then(res, rej) { return b.get().then(res, rej); },
+    };
+    return b;
+  }
+
+  return {
+    from: t => ({
+      select: c => qb(t).select(c),
+      insert: rows => req(t, { method: 'POST', body: JSON.stringify(Array.isArray(rows) ? rows : [rows]) }),
+      update: data => ({ eq: (c, v) => req(t + '?' + c + '=eq.' + encodeURIComponent(v), { method: 'PATCH', body: JSON.stringify(data) }) }),
+      upsert: (rows, onConflict) => req(t + (onConflict ? '?on_conflict=' + onConflict : ''), { method: 'POST', body: JSON.stringify(Array.isArray(rows) ? rows : [rows]), xh: { Prefer: 'resolution=merge-duplicates,return=representation' } }),
+      delete: () => ({
+        eq: (c, v) => req(t + '?' + c + '=eq.' + encodeURIComponent(v), { method: 'DELETE' }),
+        all: () => req(t + '?id=gte.0', { method: 'DELETE' }),
+      }),
+    }),
+  };
+}
+const sb = mkSB(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Helpers de formato de campos ─────────────────────────────
+// Texto limpio: quita espacios pero preserva ceros a la izquierda
+const txt  = v => (v === null || v === undefined) ? '' : String(v).trim();
+// Número (solo para cantidades reales)
+const num  = v => { const n = parseFloat(String(v).replace(',','.')); return isNaN(n) ? null : n; };
+// Booleano desde SI/NO/TRUE/FALSE/1/0
+const bool = v => { const s = txt(v).toUpperCase(); return s === 'SI' || s === 'TRUE' || s === '1' || s === 'YES'; };
+// Fecha: toma datetime string y devuelve solo YYYY-MM-DD o null
+const fecha = v => { if (!v || txt(v) === '') return null; const s = txt(v).substring(0,10); return s.length === 10 ? s : null; };
+// Alias para fmtCO (ya no transforma, solo limpia — los archivos ya vienen con ceros)
+const fmtCO = v => txt(v);
+
+// ── Estado global ────────────────────────────────────────────
+let G = {
+  user: null,      // { id, nombre, perfil_ids[], co_ids[] }
+  co: null,        // { id, nombre }
+  perfil: null,    // 'admin' | 'supervisor' | 'alistador'
+};
+
+// ── UI helpers ───────────────────────────────────────────────
+const $app = document.getElementById('app');
+const $ld  = document.getElementById('loader');
+const $ldm = document.getElementById('ldMsg');
+const $tst = document.getElementById('toast');
+const $fab = document.getElementById('fab');
+let tTimer;
+
+const ld  = (m = 'Cargando...') => { $ldm.textContent = m; $ld.style.display = 'flex'; };
+const uld = () => { $ld.style.display = 'none'; };
+function toast(m, t = 'ok') {
+  clearTimeout(tTimer);
+  $tst.innerHTML = (t === 'er' ? '❌ ' : t === 'wa' ? '⚠️ ' : '✅ ') + m;
+  $tst.style.background = t === 'er' ? 'var(--er)' : t === 'wa' ? 'var(--wa)' : 'var(--ok)';
+  $tst.style.display = 'block';
+  // Errores y advertencias necesitan cierre manual; éxitos desaparecen solos
+  if (t === 'er' || t === 'wa') {
+    $tst.onclick = () => { $tst.style.display = 'none'; };
+    $tst.style.cursor = 'pointer';
+    $tst.title = 'Toca para cerrar';
+  } else {
+    $tst.onclick = null; $tst.style.cursor = 'default';
+    tTimer = setTimeout(() => { $tst.style.display = 'none'; }, 5000);
+  }
+}
+const rdr  = html => { $app.innerHTML = html; };
+function cerrarSesion() {
+  if (!confirm('¿Cerrar sesión?')) return;
+  G = { user: null, co: null, perfil: null };
+  pgLogin();
+}
+const e    = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtn = n => n == null ? '' : Number(n).toLocaleString('es-CO');
+
+// Pct badge color
+function pctBadge(done, total) {
+  if (!total) return '<span class="badge b-gray">Sin items</span>';
+  const p = Math.round(done / total * 100);
+  const cls = p === 100 ? 'b-ok' : p > 0 ? 'b-wa' : 'b-gray';
+  return `<span class="badge ${cls}">${p}%</span>`;
+}
+
+// ── PANTALLA: Login ──────────────────────────────────────────
+function pgLogin() {
+  G = { user: null, co: null, perfil: null };
+  $fab.style.display = 'none';
+  rdr(`
+    <div class="hdr"><h1>🏭 Alistamiento</h1><span class="hdr-sub">Dislicores</span></div>
+    <div style="padding:24px 16px">
+      <div class="card" style="text-align:center;padding:28px 20px">
+        <div style="font-size:52px;margin-bottom:10px">📦</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px">Sistema de Alistamiento</div>
+        <div style="font-size:13px;color:var(--mut)">Ingresa tus credenciales para continuar</div>
+      </div>
+      <div class="card">
+        <span class="inp-label">Usuario</span>
+        <input id="liUser" class="inp" placeholder="ID de usuario" autocomplete="username"/>
+        <span class="inp-label">Contraseña</span>
+        <input id="liPass" class="inp" type="password" placeholder="Contraseña" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()"/>
+        <button class="btn btn-pr" onclick="doLogin()" style="margin-top:14px">🔐 Ingresar</button>
+        <div id="liErr" style="color:var(--er);font-size:13px;margin-top:8px;text-align:center;display:none"></div>
+      </div>
+    </div>
+  `);
+}
+
+async function doLogin() {
+  const uid = document.getElementById('liUser').value.trim();
+  const pwd = document.getElementById('liPass').value;
+  if (!uid || !pwd) { showLoginErr('Ingresa usuario y contraseña'); return; }
+  ld('Verificando...');
+  try {
+    const rows = await sb.from('usuarios').select('*').eq('usuario_id', uid);
+    uld();
+    if (!Array.isArray(rows) || rows.length === 0) { showLoginErr('Usuario no encontrado'); return; }
+    const u = rows[0];
+    if (String(u.contrasena) !== String(pwd)) { showLoginErr('Contraseña incorrecta'); return; }
+    G.user = {
+      id: u.id,
+      nombre: u.nombre,
+      perfil_ids: String(u.perfiles || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+      co_ids: String(u.centros_operacion || '').split(',').map(s => fmtCO(s.trim())).filter(Boolean),
+    };
+    pgSelectCO();
+  } catch(err) {
+    uld();
+    showLoginErr('Error: ' + err.message);
+  }
+}
+
+function showLoginErr(m) {
+  const el = document.getElementById('liErr');
+  if (el) { el.textContent = m; el.style.display = 'block'; }
+}
+
+// ── PANTALLA: Seleccionar C.O. ───────────────────────────────
+async function pgSelectCO() {
+  ld('Cargando centros de operación...');
+  // Los COs del usuario vienen del campo centros_operacion
+  const coIds = G.user.co_ids; // ya son strings "003", "006", etc.
+
+  if (!coIds || coIds.length === 0) {
+    uld();
+    rdr(`<div class="hdr"><h1>📦 Alistamiento</h1></div>
+      <div class="card" style="text-align:center;color:var(--mut);padding:24px">
+        <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+        <div style="font-weight:700">Sin centros de operación</div>
+        <div style="font-size:13px;margin-top:6px">Tu usuario no tiene COs asignados. Contacta al administrador.</div>
+      </div>`);
+    return;
+  }
+
+  // Intentar obtener descripciones desde bodegas (opcional — puede estar vacía)
+  const descMap = {};
+  try {
+    // Traer todas las bodegas y filtrar en JS (evita el .in() con muchos valores)
+    const allBodegas = await sb.from('bodegas').select('co,desc_co');
+    if (Array.isArray(allBodegas)) {
+      allBodegas.forEach(b => {
+        const k = txt(b.co);
+        if (!descMap[k] && b.desc_co) descMap[k] = txt(b.desc_co);
+      });
+    }
+  } catch(e) { /* bodegas vacía o no existe aún — no importa */ }
+
+  uld();
+
+  // Mapas de nombre por si bodegas está vacía
+  const coNombres = {
+    '001':'MEDELLIN','003':'BOGOTA','004':'BUCARAMANGA','005':'TURBACO',
+    '006':'PEREIRA','007':'ARMENIA','008':'MANIZALES','009':'CALI',
+    '010':'BARRANQUILLA','012':'IBAGUE','014':'MONTERIA','017':'VALLEDUPAR',
+    '018':'NEIVA','021':'PASTO','022':'POPAYAN','023':'TUNJA','055':'STORE LA 95 BOGOTA'
+  };
+
+  const cos = coIds.map(id => ({
+    id,
+    nombre: descMap[id] || coNombres[id] || ('CO ' + id)
+  })).sort((a, b) => a.id.localeCompare(b.id));
+
+  let html = `<div class="hdr"><h1>📦 Alistamiento</h1><span class="hdr-sub">Hola, ${e(G.user.nombre)}</span></div>
+  <div style="padding:12px 16px 6px;font-size:12px;font-weight:700;color:var(--mut)">SELECCIONA CENTRO DE OPERACIÓN</div>`;
+
+  cos.forEach(co => {
+    html += `<div class="list-item" onclick="selectCO('${e(co.id)}','${e(co.nombre)}')">
+      <div class="li-icon">🏢</div>
+      <div class="li-body">
+        <div class="li-name">CO ${e(co.id)} — ${e(co.nombre)}</div>
+      </div>
+      <div class="li-arr">›</div>
+    </div>`;
+  });
+  rdr(html);
+}
+
+function selectCO(id, nombre) {
+  G.co = { id, nombre };
+  pgSelectPerfil();
+}
+
+// ── PANTALLA: Seleccionar perfil ─────────────────────────────
+function pgSelectPerfil() {
+  const perfiles = G.user.perfil_ids;
+  const opts = [
+    { id: 'admin',      icon: '⚙️',  label: 'Administrador', desc: 'Zonas, Kits, Usuarios, Bodegas' },
+    { id: 'supervisor', icon: '👔',  label: 'Supervisor',    desc: 'Pedidos y Requisiciones' },
+    { id: 'alistador',  icon: '📋',  label: 'Alistador',     desc: 'Preparación de pedidos' },
+  ].filter(o => perfiles.includes(o.id));
+
+  if (opts.length === 1) { G.perfil = opts[0].id; pgHome(); return; }
+
+  let html = `<div class="hdr">
+    <button class="hdr-btn" onclick="pgSelectCO()">← CO</button>
+    <h1 style="flex:1;text-align:center">CO ${G.co.id} — ${e(G.co.nombre)}</h1>
+  </div>
+  <div style="padding:16px">
+    <div class="card"><div style="font-weight:700;margin-bottom:12px">¿Con qué perfil ingresas?</div>
+    <div class="role-grid">`;
+  opts.forEach(o => {
+    html += `<div class="role-card" onclick="G.perfil='${o.id}';pgHome()">
+      <div class="role-ico">${o.icon}</div>
+      <div class="role-lbl">${o.label}</div>
+      <div style="font-size:10px;color:var(--mut);margin-top:4px">${o.desc}</div>
+    </div>`;
+  });
+  html += `</div></div></div>`;
+  rdr(html);
+}
+
+// ── PANTALLA: Home según perfil ──────────────────────────────
+function pgHome() {
+  if (G.perfil === 'admin')      pgAdmin();
+  else if (G.perfil === 'supervisor') pgSupervisor();
+  else pgAlistador();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ADMINISTRADOR
+// ═══════════════════════════════════════════════════════════
+function pgAdmin() {
+  $fab.style.display = 'none';
+  const co = G.co;
+  rdr(`<div class="hdr">
+    <button class="hdr-btn" onclick="pgSelectPerfil()">← Perfil</button>
+    <h1>⚙️ Administrador</h1>
+    <button class="hdr-btn" onclick="cerrarSesion()" style="background:rgba(255,255,255,0.15)">🚪 Salir</button>
+  </div>
+  <div style="padding:12px">
+    ${adminCard('🗺️','Zonas','Asignación de referencias a zonas/secuencias','pgTablaZonas()')}
+    ${adminCard('🎁','Kits','Composición de ofertas y promociones','pgTablaKits()')}
+    ${adminCard('👤','Usuarios','Accesos, perfiles y COs autorizados','pgTablaUsuarios()')}
+    ${adminCard('🏪','Bodegas','Maestro de bodegas y centros de operación','pgTablaBodegas()')}
+    ${adminCard('📋','Log Importaciones','Historial de cargas con estado y errores','pgLogImportaciones()')}
+
+  </div>`);
+}
+
+function adminCard(ico, titulo, desc, onclick) {
+  return `<div class="list-item" onclick="${onclick}">
+    <div class="li-icon">${ico}</div>
+    <div class="li-body"><div class="li-name">${titulo}</div><div class="li-sub">${desc}</div></div>
+    <div class="li-arr">›</div>
+  </div>`;
+}
+
+// ── Tabla Zonas ──────────────────────────────────────────────
+async function pgTablaZonas() {
+  ld('Cargando zonas...');
+  try {
+    const rows = await sb.from('zonas').select('*').eq('co', G.co.id).order('secuencia', true);
+    const kRows = await sb.from('kits').select('referencia').get();
+    const kitRefs = new Set((Array.isArray(kRows) ? kRows : []).map(r => String(r.referencia)));
+    uld();
+    renderTablaZonas(Array.isArray(rows) ? rows : [], kitRefs);
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+function renderTablaZonas(rows, kitRefs, filtros = {}) {
+  // Obtener listas para filtros
+  const zonaOpts = [...new Set(rows.map(r => r.zona).filter(Boolean))].sort();
+  const bodOpts  = [...new Set(rows.map(r => r.bodega_id).filter(Boolean))].sort();
+  // Aplicar filtros
+  let datos = rows;
+  if (filtros.ref)  datos = datos.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+  if (filtros.desc) datos = datos.filter(r => String(r.descripcion||'').toLowerCase().includes(filtros.desc.toLowerCase()));
+  if (filtros.zona) datos = datos.filter(r => r.zona === filtros.zona);
+  if (filtros.bod)  datos = datos.filter(r => String(r.bodega_id) === filtros.bod);
+
+  let html = `<div class="hdr">
+    <button class="hdr-btn" onclick="pgAdmin()">← Admin</button>
+    <h1>🗺️ Zonas CO ${G.co.id}</h1>
+    <button class="hdr-btn" onclick="saveZonas()">💾 Guardar</button>
+  </div>
+  <div class="filter-bar">
+    <input id="zf1" placeholder="🔍 Referencia" value="${e(filtros.ref||'')}" oninput="window.zonaFiltros.ref=this.value;refreshZonasTbody(window._zonaRows,window._kitRefs,window.zonaFiltros)"/>
+    <input id="zf2" placeholder="🔍 Descripción" value="${e(filtros.desc||'')}" oninput="window.zonaFiltros.desc=this.value;refreshZonasTbody(window._zonaRows,window._kitRefs,window.zonaFiltros)"/>
+    <select onchange="window.zonaFiltros.zona=this.value;refreshZonasTbody(window._zonaRows,window._kitRefs,window.zonaFiltros)">
+      <option value="">Todas las zonas</option>
+      ${zonaOpts.map(z=>`<option value="${e(z)}" ${filtros.zona===z?'selected':''}>${e(z)}</option>`).join('')}
+    </select>
+    <select onchange="window.zonaFiltros.bod=this.value;refreshZonasTbody(window._zonaRows,window._kitRefs,window.zonaFiltros)">
+      <option value="">Todas las bodegas</option>
+      ${bodOpts.map(b=>`<option value="${e(String(b))}" ${filtros.bod===String(b)?'selected':''}>${e(String(b))}</option>`).join('')}
+    </select>
+  </div>
+  <div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span id="zonaCount" style="font-size:12px;color:var(--mut);flex:1">${datos.length} de ${rows.length}</span>
+    <button class="btn btn-sm btn-ok" onclick="openNuevaZona()">＋ Nueva</button>
+    <label class="file-btn" style="background:#0f766e;display:inline-flex;width:auto;padding:6px 10px;font-size:12px;margin-top:0">📂 Cargar<input type="file" accept=".xlsx,.xls" onchange="handleZonasFile(event)"/></label>
+    <button class="btn btn-sm" style="background:#1d4ed8;color:#fff" onclick="exportTableFiltrado('zonas',window._zonaRows,window.zonaFiltros)">📥 Exportar</button>
+  </div>
+  <div class="tbl-wrap" style="margin:4px 14px">
+  <table class="tbl" id="zonasTbl">
+    <thead><tr>
+      <th>Ref.</th><th>Descripción</th><th>Bodega</th><th>Zona</th><th>Sec.</th><th>Desglosar</th><th></th>
+    </tr></thead><tbody id="zonasTbody">`;
+
+  datos.forEach(row => {
+    const esKit = kitRefs.has(String(row.referencia));
+    const rowEnc = encodeURIComponent(JSON.stringify({id:row.id,referencia:row.referencia,descripcion:row.descripcion,bodega_id:row.bodega_id,zona:row.zona,secuencia:row.secuencia,desglosar_oferta:row.desglosar_oferta,co:row.co}));
+    html += `<tr data-id="${row.id}" data-dirty="">
+      <td style="white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis" title="${e(String(row.referencia||''))}">${e(String(row.referencia||''))}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e(String(row.descripcion||''))}">${e(String(row.descripcion||''))}</td>
+      <td>${e(String(row.bodega_id||''))}</td>
+      <td><input class="edit-inp" value="${e(String(row.zona||''))}" data-f="zona" onchange="markDirty(this)" style="width:90px"/></td>
+      <td><input class="edit-inp" type="number" value="${row.secuencia||''}" data-f="secuencia" style="width:52px;text-align:center" onchange="markDirty(this)"/></td>
+      <td style="text-align:center">${esKit ? `<label class="tog"><input type="checkbox" data-f="desglosar_oferta" ${row.desglosar_oferta?'checked':''} onchange="markDirty(this)"/><span class="tog-sl"></span></label>` : '<span style="color:var(--mut);font-size:11px">—</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" onclick="openDetalleRow('zonas','${rowEnc}')">✏️</button>
+        <button class="btn btn-sm btn-er" style="padding:4px 8px;margin-left:2px" onclick="deleteZona('${row.id}')">🗑</button>
+      </td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>
+  <div style="padding:10px 14px"><button class="btn btn-pr" onclick="saveZonas()">💾 Guardar cambios</button></div>`;
+
+  window._zonaRows = rows; window._kitRefs = kitRefs; window.zonaFiltros = filtros;
+  rdr(html);
+}
+
+function refreshZonasTbody(rows, kitRefs, filtros) {
+  window._zonaRows = rows; window._kitRefs = kitRefs; window.zonaFiltros = filtros;
+  const zonaOpts = [...new Set((window._zonaRows||[]).map(r=>r.zona).filter(Boolean))].sort();
+  let datos = rows;
+  if (filtros.ref)  datos = datos.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+  if (filtros.desc) datos = datos.filter(r => String(r.descripcion||'').toLowerCase().includes(filtros.desc.toLowerCase()));
+  if (filtros.zona) datos = datos.filter(r => r.zona === filtros.zona);
+  if (filtros.bod)  datos = datos.filter(r => String(r.bodega_id) === filtros.bod);
+  const tbody = document.getElementById('zonasTbody');
+  if (!tbody) { renderTablaZonas(rows, kitRefs, filtros); return; }
+  let tbHtml = '';
+  datos.forEach(row => {
+    const esKit = kitRefs.has(String(row.referencia));
+    tbHtml += `<tr data-id="${row.id}" data-dirty="">
+      <td><input class="edit-inp" value="${e(String(row.referencia||''))}" data-f="referencia" onchange="markDirty(this)"/></td>
+      <td><input class="edit-inp" value="${e(String(row.descripcion||''))}" data-f="descripcion" onchange="markDirty(this)"/></td>
+      <td><input class="edit-inp" value="${e(String(row.bodega_id||''))}" data-f="bodega_id" style="width:70px" onchange="markDirty(this)"/></td>
+      <td><input class="edit-inp" value="${e(String(row.zona||''))}" data-f="zona" onchange="markDirty(this)"/></td>
+      <td><input class="edit-inp" type="number" value="${row.secuencia||''}" data-f="secuencia" style="width:55px;text-align:center" onchange="markDirty(this)"/></td>
+      <td style="text-align:center">${esKit ? `<label class="tog"><input type="checkbox" data-f="desglosar_oferta" ${row.desglosar_oferta?'checked':''} onchange="markDirty(this)"/><span class="tog-sl"></span></label>` : '<span style="color:var(--mut);font-size:11px">N/A</span>'}</td>
+      <td><button class="btn btn-sm btn-er" onclick="deleteZona(\'' + row.id + '\')">🗑</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = tbHtml;
+  const countEl = document.getElementById('zonaCount');
+  if (countEl) countEl.textContent = datos.length + ' de ' + rows.length;
+}
+
+function markDirty(el) { el.closest('tr').dataset.dirty = '1'; }
+
+async function saveZonas() {
+  const rows = document.querySelectorAll('#zonasTbl tbody tr[data-dirty="1"]');
+  if (!rows.length) { toast('Sin cambios', 'wa'); return; }
+  ld('Guardando ' + rows.length + ' cambios...');
+  let ok = 0, errs = 0;
+  for (const row of rows) {
+    const id = row.dataset.id;
+    const upd = {};
+    row.querySelectorAll('[data-f]').forEach(f => {
+      const field = f.dataset.f;
+      if (field === 'desglosar_oferta') upd[field] = f.checked;
+      else if (field === 'secuencia') upd[field] = f.value ? parseInt(f.value) : null;
+      else upd[field] = f.value;
+    });
+    try { await sb.from('zonas').update(upd).eq('id', id); row.dataset.dirty = ''; ok++; }
+    catch { errs++; }
+  }
+  uld();
+  toast(errs ? `${ok} ok, ${errs} errores` : `✅ ${ok} actualizadas`, errs ? 'wa' : 'ok');
+}
+
+async function deleteZona(id) {
+  if (!confirm('¿Eliminar esta referencia de zonas?')) return;
+  ld('Eliminando...');
+  try {
+    await sb.from('zonas').delete().eq('id', id);
+    uld(); toast('Eliminada');
+    pgTablaZonas();
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function openNuevaZona() {
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="nzModal" style="display:flex" onclick="if(event.target.id==='nzModal')event.target.remove()">
+      <div class="modal">
+        <div class="modal-hdl"></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px">➕ Nueva referencia en zonas</div>
+        <span class="inp-label">Referencia</span><input id="nzRef" class="inp" placeholder="Código de referencia"/>
+        <span class="inp-label">Descripción</span><input id="nzDesc" class="inp" placeholder="Descripción"/>
+        <span class="inp-label">Bodega</span><input id="nzBod" class="inp" placeholder="Código bodega"/>
+        <span class="inp-label">Zona</span><input id="nzZona" class="inp" placeholder="Ej: ZALIMENTOS"/>
+        <span class="inp-label">Secuencia</span><input id="nzSeq" class="inp" type="number" placeholder="Número de orden"/>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('nzModal').remove()">Cancelar</button>
+          <button class="btn btn-ok" style="flex:1" onclick="saveNuevaZona()">Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function saveNuevaZona() {
+  const ref  = document.getElementById('nzRef').value.trim();
+  const desc = document.getElementById('nzDesc').value.trim();
+  const bod  = document.getElementById('nzBod').value.trim();
+  const zona = document.getElementById('nzZona').value.trim();
+  const seq  = parseInt(document.getElementById('nzSeq').value) || null;
+  if (!ref || !zona) { toast('Referencia y zona son obligatorios', 'wa'); return; }
+  ld('Guardando...');
+  try {
+    await sb.from('zonas').insert([{ referencia: ref, descripcion: desc, bodega_id: bod, zona, secuencia: seq, co: G.co.id, desglosar_oferta: false }]);
+    document.getElementById('nzModal')?.remove();
+    uld(); toast('✅ Referencia agregada');
+    pgTablaZonas();
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+async function handleZonasFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  ld('Procesando zonas...');
+  try {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const records = rows.map(r => ({
+      referencia:       txt(r['REFERENCIA']      || r['Referencia']     || ''),
+      descripcion:      txt(r['DESCRIPCION']     || r['Descripcion']    || ''),
+      zona:             txt(r['ZONA']            || r['Zona']           || '').toUpperCase(),
+      secuencia:        num(r['SECUENCIA']       || r['Secuencia']      || ''),
+      desglosar_oferta: bool(r['DESGLOSAR_OFERTA']|| r['Desglosar oferta'] || ''),
+      bodega_id:        txt(r['BODEGA_ID']       || r['Bodega']         || ''),
+      co:               txt(r['C.O.']            || r['co']             || '') || G.co.id,
+    })).filter(r => r.referencia && r.zona);
+
+    if (!records.length) { uld(); toast('No se encontraron datos válidos', 'er'); return; }
+    // Upsert por referencia+bodega+co
+    // Group by CO and delete existing, then insert fresh
+    ld('Procesando ' + records.length + ' zonas...');
+    const cosEnFile = [...new Set(records.map(r => r.co).filter(Boolean))];
+    let zOk = 0, zErr = 0, zErrMsg = '';
+    for (const co of cosEnFile) {
+      try { await sb.from('zonas').delete().eq('co', co); } catch(e) { console.warn('zonas delete', co, e.message); }
+    }
+    for (let i = 0; i < records.length; i += 100) {
+      try {
+        await sb.from('zonas').insert(records.slice(i, i+100));
+        zOk += Math.min(100, records.length - i);
+      } catch(e) {
+        zErr += Math.min(100, records.length - i);
+        zErrMsg = e.message;
+        console.error('Zonas insert batch', i, ':', e.message);
+      }
+    }
+    uld();
+    const zMsg = zErr > 0 ? zOk + ' ok, ' + zErr + ' errores: ' + zErrMsg.substring(0,80) : zOk + ' zonas actualizadas';
+    toast(zErr > 0 ? zMsg : '✅ ' + zMsg, zErr > 0 ? 'wa' : 'ok');
+    logImportacion('zonas', zOk, zErr>0?'parcial':'exito', zOk+' zonas actualizadas', zErr, zErr>0?zErrMsg:'');
+    pgTablaZonas();
+  } catch(err) {
+    uld();
+    toast('Error: ' + err.message, 'er');
+    logImportacion('zonas', 0, 'error', 'Fallo total', 0, err.message);
+  }
+}
+
+// ── Tabla Kits ───────────────────────────────────────────────
+async function pgTablaKits() {
+  ld('Cargando kits...');
+  try {
+    const rows = await sb.from('kits').select('*').order('referencia', true);
+    uld(); renderTablaKits(Array.isArray(rows) ? rows : []);
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function renderTablaKits(rows, filtros = {}) {
+  window._kitRows = rows;
+  window.kitFiltros = filtros;
+  let datos = rows;
+  if (filtros.ref)  datos = datos.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+  if (filtros.desc) datos = datos.filter(r => String(r.desc_item||'').toLowerCase().includes(filtros.desc.toLowerCase()));
+  if (filtros.comp) datos = datos.filter(r => String(r.referencia_comp||'').toLowerCase().includes(filtros.comp.toLowerCase()));
+
+  // If the shell already exists, only update the dynamic parts (preserves focus)
+  if (document.getElementById('kitShell')) {
+    document.getElementById('kitCount').textContent = datos.length + ' de ' + rows.length;
+    const tbody = document.getElementById('kitTbody');
+    let tbHtml = '';
+    datos.slice(0, 500).forEach(r => {
+      const kEnc = encodeURIComponent(JSON.stringify({id:r.id,referencia:r.referencia,desc_item:r.desc_item,referencia_comp:r.referencia_comp,desc_item_comp:r.desc_item_comp,cantidad_requerida:r.cantidad_requerida}));
+      tbHtml += `<tr>
+        <td><input type="checkbox" class="kit-sel" data-id="${r.id}" style="cursor:pointer"/></td>
+        <td style="white-space:nowrap">${e(String(r.referencia||''))}</td>
+        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e(String(r.desc_item||''))}">${e(String(r.desc_item||''))}</td>
+        <td style="white-space:nowrap">${e(String(r.referencia_comp||''))}</td>
+        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e(String(r.desc_item_comp||''))}">${e(String(r.desc_item_comp||''))}</td>
+        <td style="text-align:right">${fmtn(r.cantidad_requerida)}</td>
+        <td><button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" onclick="openDetalleRow('kits','${kEnc}')">✏️</button></td>
+      </tr>`;
+    });
+    if (datos.length > 500) tbHtml += `<tr><td colspan="5" style="text-align:center;color:var(--mut);padding:8px">... y ${datos.length-500} más — refina el filtro</td></tr>`;
+    tbody.innerHTML = tbHtml;
+    return;
+  }
+
+  // First render — build full shell
+  let html = `<div class="hdr" id="kitShell">
+    <button class="hdr-btn" onclick="pgAdmin()">← Admin</button>
+    <h1>🎁 Kits</h1>
+    <span class="hdr-sub">${rows.length} total</span>
+  </div>
+  <div class="filter-bar">
+    <input id="kf1" placeholder="🔍 Ref. oferta" value="${e(filtros.ref||'')}" oninput="window.kitFiltros.ref=this.value;renderTablaKits(window._kitRows,window.kitFiltros)"/>
+    <input id="kf2" placeholder="🔍 Descripción" value="${e(filtros.desc||'')}" oninput="window.kitFiltros.desc=this.value;renderTablaKits(window._kitRows,window.kitFiltros)"/>
+    <input id="kf3" placeholder="🔍 Ref. comp." value="${e(filtros.comp||'')}" oninput="window.kitFiltros.comp=this.value;renderTablaKits(window._kitRows,window.kitFiltros)"/>
+  </div>
+  <div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span id="kitCount" style="font-size:12px;color:var(--mut);flex:1">${datos.length} de ${rows.length}</span>
+    <button class="btn btn-sm btn-ok" onclick="openNuevoKit()">＋ Nuevo</button>
+    <label class="file-btn" style="background:#0f766e;display:inline-flex;width:auto;padding:6px 10px;font-size:12px;margin-top:0">📂 Cargar<input type="file" accept=".xlsx,.xls" onchange="handleKitsFile(event)"/></label>
+    <button class="btn btn-sm" style="background:#1d4ed8;color:#fff" onclick="exportTableFiltrado('kits',window._kitRows,window.kitFiltros)">📥 Exportar</button>
+    <button class="btn btn-sm btn-er" onclick="eliminarSeleccionados('kit','kits')">🗑 Eliminar sel.</button>
+  </div>
+  <div class="tbl-wrap" style="margin:4px 14px">
+  <table class="tbl">
+    <thead><tr><th style="width:28px"><input type="checkbox" id="kitSelAll" onchange="toggleSelAll('kit',this.checked)" style="cursor:pointer"/></th><th>Ref. oferta</th><th>Desc. oferta</th><th>Ref. comp.</th><th>Desc. comp.</th><th>Cant.</th><th></th></tr></thead>
+    <tbody id="kitTbody">`;
+  datos.slice(0, 500).forEach(r => {
+    const kEnc = encodeURIComponent(JSON.stringify({id:r.id,referencia:r.referencia,desc_item:r.desc_item,referencia_comp:r.referencia_comp,desc_item_comp:r.desc_item_comp,cantidad_requerida:r.cantidad_requerida}));
+    html += `<tr>
+      <td><input type="checkbox" class="kit-sel" data-id="${r.id}" style="cursor:pointer"/></td>
+      <td style="white-space:nowrap">${e(String(r.referencia||''))}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e(String(r.desc_item||''))}">${e(String(r.desc_item||''))}</td>
+      <td style="white-space:nowrap">${e(String(r.referencia_comp||''))}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e(String(r.desc_item_comp||''))}">${e(String(r.desc_item_comp||''))}</td>
+      <td style="text-align:right">${fmtn(r.cantidad_requerida)}</td>
+      <td><button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" onclick="openDetalleRow('kits','${kEnc}')">✏️</button></td>
+    </tr>`;
+  });
+  if (datos.length > 500) html += `<tr><td colspan="7" style="text-align:center;color:var(--mut);padding:8px">... y ${datos.length-500} más — refina el filtro</td></tr>`;
+  html += `</tbody></table></div>`;
+  rdr(html);
+}
+
+
+function openNuevoKit() {
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="nkModal" style="display:flex" onclick="if(event.target.id==='nkModal')event.target.remove()">
+      <div class="modal">
+        <div class="modal-hdl"></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px">➕ Nuevo componente kit</div>
+        <span class="inp-label">Referencia oferta</span><input id="nkRef" class="inp" placeholder="Código de la oferta"/>
+        <span class="inp-label">Descripción oferta</span><input id="nkDesc" class="inp" placeholder="Nombre de la oferta"/>
+        <span class="inp-label">Referencia componente</span><input id="nkComp" class="inp" placeholder="Código del componente"/>
+        <span class="inp-label">Descripción componente</span><input id="nkDescC" class="inp" placeholder="Nombre del componente"/>
+        <span class="inp-label">Cantidad requerida</span><input id="nkQty" class="inp" type="number" min="0.01" step="0.01" placeholder="1"/>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('nkModal').remove()">Cancelar</button>
+          <button class="btn btn-ok" style="flex:1" onclick="saveNuevoKit()">Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function saveNuevoKit() {
+  const ref   = document.getElementById('nkRef').value.trim();
+  const desc  = document.getElementById('nkDesc').value.trim();
+  const comp  = document.getElementById('nkComp').value.trim();
+  const descC = document.getElementById('nkDescC').value.trim();
+  const qty   = parseFloat(document.getElementById('nkQty').value) || 0;
+  if (!ref || !comp || qty <= 0) { toast('Referencia oferta, componente y cantidad son obligatorios', 'wa'); return; }
+  ld();
+  try {
+    await sb.from('kits').insert([{ referencia: ref, desc_item: desc, referencia_comp: comp, desc_item_comp: descC, cantidad_requerida: qty }]);
+    document.getElementById('nkModal')?.remove(); uld(); toast('✅ Componente agregado');
+    pgTablaKits();
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+async function handleKitsFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  ld('Procesando kits...');
+  try {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const records = rows.map(r => ({
+      referencia:         txt(r['Referencia']        || r['REFERENCIA']        || Object.values(r)[0] || ''),
+      desc_item:          txt(r['Desc. item']         || r['DESC_ITEM']         || Object.values(r)[1] || ''),
+      referencia_comp:    txt(r['Referencia comp.']   || r['REF_COMP']          || Object.values(r)[2] || ''),
+      desc_item_comp:     txt(r['Desc. item comp.']   || r['DESC_COMP']         || Object.values(r)[3] || ''),
+      cantidad_requerida: num(r['Cantidad Requerida'] || r['CANTIDAD']          || Object.values(r)[4] || 0),
+    })).filter(r => r.referencia && r.referencia_comp && r.cantidad_requerida > 0);
+
+    if (!records.length) { uld(); toast('No se encontraron kits válidos', 'er'); return; }
+    // Delete existing kits for refs in this file, then insert fresh
+    ld('Procesando ' + records.length + ' componentes...');
+    const refsEnFile = [...new Set(records.map(r => r.referencia))];
+    let kOk = 0, kErr = 0, kErrMsg = '';
+    // Delete in batches of refs
+    for (let i = 0; i < refsEnFile.length; i += 50) {
+      const batch = refsEnFile.slice(i, i+50);
+      for (const ref of batch) {
+        try { await sb.from('kits').delete().eq('referencia', ref); } catch(e) { console.warn('kit delete', ref, e.message); }
+      }
+    }
+    // Insert fresh
+    for (let i = 0; i < records.length; i += 100) {
+      try {
+        await sb.from('kits').insert(records.slice(i, i+100));
+        kOk += Math.min(100, records.length - i);
+      } catch(e) {
+        kErr += Math.min(100, records.length - i);
+        kErrMsg = e.message;
+        console.error('Kits insert batch', i, ':', e.message);
+      }
+    }
+    uld();
+    const kMsg = kErr > 0 ? kOk + ' ok, ' + kErr + ' errores: ' + kErrMsg.substring(0,80) : kOk + ' componentes actualizados';
+    toast(kErr > 0 ? kMsg : '✅ ' + kMsg, kErr > 0 ? 'wa' : 'ok');
+    logImportacion('kits', kOk, kErr>0?'parcial':'exito', kOk+' componentes actualizados', kErr, kErr>0?kErrMsg:'');
+    pgTablaKits();
+  } catch(err) {
+    uld();
+    toast('Error: ' + err.message, 'er');
+    logImportacion('kits', 0, 'error', 'Fallo total', 0, err.message);
+  }
+}
+
+// ── Tabla Usuarios ───────────────────────────────────────────
+async function pgTablaUsuarios() {
+  ld('Cargando usuarios...');
+  try {
+    const rows = await sb.from('usuarios').select('*').order('nombre', true);
+    uld(); renderTablaUsuarios(Array.isArray(rows) ? rows : []);
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function renderTablaUsuarios(rows, filtros = {}) {
+  let datos = rows;
+  if (filtros.nom)  datos = datos.filter(r => String(r.nombre||'').toLowerCase().includes(filtros.nom.toLowerCase()));
+  if (filtros.co)   datos = datos.filter(r => String(r.centros_operacion||'').includes(filtros.co));
+  if (filtros.per)  datos = datos.filter(r => String(r.perfiles||'').toLowerCase().includes(filtros.per.toLowerCase()));
+
+  let html = `<div class="hdr">
+    <button class="hdr-btn" onclick="pgAdmin()">← Admin</button>
+    <h1>👤 Usuarios</h1>
+    <button class="hdr-btn" onclick="openNuevoUsuario()">＋</button>
+  </div>
+  <div class="filter-bar">
+    <input id="uf1" placeholder="🔍 Nombre" value="${e(filtros.nom||'')}" oninput="window.uFiltros.nom=this.value;window.uFiltros=window.uFiltros;renderTablaUsuarios(window._uRows,window.uFiltros)"/>
+    <input id="uf2" placeholder="🔍 CO" value="${e(filtros.co||'')}" oninput="window.uFiltros.co=this.value;renderTablaUsuarios(window._uRows,window.uFiltros)"/>
+    <input id="uf3" placeholder="🔍 Perfil" value="${e(filtros.per||'')}" oninput="window.uFiltros.per=this.value;renderTablaUsuarios(window._uRows,window.uFiltros)"/>
+  </div>
+  <div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--mut);flex:1">${datos.length} usuarios</span>
+    <label class="file-btn" style="background:#0f766e;display:inline-flex;width:auto;padding:6px 10px;font-size:12px;margin-top:0">📂 Cargar<input type="file" accept=".xlsx,.xls" onchange="handleUsuariosFile(event)"/></label>
+    <button class="btn btn-sm" style="background:#1d4ed8;color:#fff" onclick="exportTableFiltrado('usuarios',window._uRows,window.uFiltros)">📥 Exportar</button>
+    <button class="btn btn-sm btn-er" onclick="eliminarSeleccionadosGen('usr','usuarios',pgTablaUsuarios)">🗑 Eliminar sel.</button>
+  </div>
+  <div class="tbl-wrap" style="margin:4px 14px">
+  <table class="tbl" id="uTbl">
+    <thead><tr><th style="width:28px"><input type="checkbox" id="usrSelAll" onchange="toggleSelAll('usr',this.checked)" style="cursor:pointer"/></th><th>ID</th><th>Nombre</th><th>COs</th><th>Perfiles</th><th>Activo</th><th></th></tr></thead>
+    <tbody>`;
+  datos.forEach(row => {
+    const uEnc = encodeURIComponent(JSON.stringify({id:row.id,usuario_id:row.usuario_id,nombre:row.nombre,contrasena:row.contrasena,centros_operacion:row.centros_operacion,perfiles:row.perfiles,activo:row.activo}));
+    html += `<tr data-id="${row.id}" data-dirty="">
+      <td><input type="checkbox" class="usr-sel" data-id="${row.id}" style="cursor:pointer"/></td>
+      <td>${e(String(row.usuario_id||''))}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e(String(row.nombre||''))}</td>
+      <td style="font-size:11px">${e(String(row.centros_operacion||''))}</td>
+      <td style="font-size:11px">${e(String(row.perfiles||''))}</td>
+      <td style="text-align:center"><span class="badge ${row.activo?'b-ok':'b-gray'}">${row.activo?'Sí':'No'}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" onclick="openDetalleRow('usuarios','${uEnc}')">✏️</button>
+
+      </td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>
+  <div style="padding:10px 14px"><button class="btn btn-pr" onclick="saveUsuarios()">💾 Guardar cambios</button></div>`;
+  window._uRows = rows; window.uFiltros = filtros;
+  rdr(html);
+}
+
+function markDirtyU(el) { el.closest('tr').dataset.dirty = '1'; }
+
+async function saveUsuarios() {
+  const rows = document.querySelectorAll('#uTbl tbody tr[data-dirty="1"]');
+  if (!rows.length) { toast('Sin cambios', 'wa'); return; }
+  ld('Guardando...');
+  let ok = 0, errs = 0;
+  for (const row of rows) {
+    const id = row.dataset.id;
+    const upd = {};
+    row.querySelectorAll('[data-f]').forEach(f => {
+      upd[f.dataset.f] = f.type === 'checkbox' ? f.checked : f.value;
+    });
+    try { await sb.from('usuarios').update(upd).eq('id', id); row.dataset.dirty = ''; ok++; }
+    catch { errs++; }
+  }
+  uld();
+  toast(errs ? `${ok} ok, ${errs} errores` : `✅ ${ok} actualizados`, errs ? 'wa' : 'ok');
+}
+
+async function deleteUsuario(id) {
+  if (!confirm('¿Eliminar usuario?')) return;
+  ld(); try { await sb.from('usuarios').delete().eq('id', id); uld(); toast('Eliminado'); pgTablaUsuarios(); }
+  catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function openNuevoUsuario() {
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="nuModal" style="display:flex" onclick="if(event.target.id==='nuModal')event.target.remove()">
+      <div class="modal">
+        <div class="modal-hdl"></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px">➕ Nuevo usuario</div>
+        <span class="inp-label">ID de usuario</span><input id="nuId" class="inp" placeholder="Ej: U001"/>
+        <span class="inp-label">Nombre</span><input id="nuNom" class="inp" placeholder="Nombre completo"/>
+        <span class="inp-label">Contraseña</span><input id="nuPwd" class="inp" type="password" placeholder="Contraseña"/>
+        <span class="inp-label">Centros de operación (separados por coma)</span><input id="nuCo" class="inp" placeholder="Ej: 003,006,009"/>
+        <span class="inp-label">Perfiles (admin,supervisor,alistador)</span><input id="nuPer" class="inp" placeholder="Ej: supervisor,alistador"/>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('nuModal').remove()">Cancelar</button>
+          <button class="btn btn-ok" style="flex:1" onclick="saveNuevoUsuario()">Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function saveNuevoUsuario() {
+  const uid = document.getElementById('nuId').value.trim();
+  const nom = document.getElementById('nuNom').value.trim();
+  const pwd = document.getElementById('nuPwd').value;
+  const cos = document.getElementById('nuCo').value.trim();
+  const per = document.getElementById('nuPer').value.trim().toLowerCase();
+  if (!uid || !nom || !pwd) { toast('ID, nombre y contraseña son obligatorios', 'wa'); return; }
+  ld();
+  try {
+    await sb.from('usuarios').insert([{ usuario_id: uid, nombre: nom, contrasena: pwd, centros_operacion: cos, perfiles: per, activo: true }]);
+    document.getElementById('nuModal')?.remove(); uld(); toast('✅ Usuario creado');
+    pgTablaUsuarios();
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+async function handleUsuariosFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  ld('Cargando usuarios...');
+  try {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const records = rows.map(r => ({
+      usuario_id:        txt(r['USUARIO_ID']         || r['usuario_id']        || ''),
+      nombre:            txt(r['NOMBRE']             || r['nombre']            || ''),
+      contrasena:        txt(r['CONTRASENA']         || r['contrasena']        || ''),
+      centros_operacion: txt(r['CENTROS_OPERACION']  || r['centros_operacion'] || ''),
+      perfiles:          txt(r['PERFILES']           || r['perfiles']          || '').toLowerCase(),
+      activo:            bool(r['ACTIVO'] !== undefined ? r['ACTIVO'] : 'SI'),
+    })).filter(r => r.usuario_id);
+    if (!records.length) { uld(); toast('No se encontraron usuarios', 'er'); return; }
+    for (const rec of records) {
+      await sb.from('usuarios').upsert([rec], 'usuario_id');
+    }
+    uld(); toast('✅ ' + records.length + ' usuarios cargados');
+    pgTablaUsuarios();
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+// ── Tabla Bodegas ────────────────────────────────────────────
+async function pgTablaBodegas() {
+  ld('Cargando bodegas...');
+  try {
+    const rows = await sb.from('bodegas').select('*').eq('co', G.co.id).order('codigo', true);
+    uld(); renderTablaBodegas(Array.isArray(rows) ? rows : []);
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function renderTablaBodegas(rows, filtros = {}) {
+  let datos = rows;
+  if (filtros.cod)  datos = datos.filter(r => String(r.codigo||'').toLowerCase().includes(filtros.cod.toLowerCase()));
+  if (filtros.desc) datos = datos.filter(r => String(r.descripcion||'').toLowerCase().includes(filtros.desc.toLowerCase()));
+  if (filtros.ciu)  datos = datos.filter(r => String(r.desc_ciudad||'').toLowerCase().includes(filtros.ciu.toLowerCase()));
+  if (filtros.co)   datos = datos.filter(r => String(r.co||'').includes(filtros.co));
+
+  let html = `<div class="hdr">
+    <button class="hdr-btn" onclick="pgAdmin()">← Admin</button>
+    <h1>🏪 Bodegas CO ${G.co.id}</h1>
+    <span class="hdr-sub">${rows.length}</span>
+  </div>
+  <div class="filter-bar">
+    <input id="bf1" placeholder="🔍 Código" value="${e(filtros.cod||'')}" oninput="window.bFiltros.cod=this.value;renderTablaBodegas(window._bRows,window.bFiltros)"/>
+    <input id="bf2" placeholder="🔍 Descripción" value="${e(filtros.desc||'')}" oninput="window.bFiltros.desc=this.value;renderTablaBodegas(window._bRows,window.bFiltros)"/>
+    <input id="bf3" placeholder="🔍 Ciudad" value="${e(filtros.ciu||'')}" oninput="window.bFiltros.ciu=this.value;renderTablaBodegas(window._bRows,window.bFiltros)"/>
+    <input id="bf4" placeholder="🔍 CO" value="${e(filtros.co||'')}" oninput="window.bFiltros.co=this.value;renderTablaBodegas(window._bRows,window.bFiltros)"/>
+  </div>
+  <div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--mut);flex:1">${datos.length} de ${rows.length}</span>
+    <button class="btn btn-sm btn-ok" onclick="openNuevaBodega()">＋ Nueva</button>
+    <button class="btn btn-sm btn-er" onclick="eliminarSeleccionados('bod','bodegas')">🗑 Eliminar sel.</button>
+    <label class="file-btn" style="background:#0f766e;display:inline-flex;width:auto;padding:6px 10px;font-size:12px;margin-top:0">📂 Cargar<input type="file" accept=".xlsx,.xls" onchange="handleBodegasFile(event)"/></label>
+    <button class="btn btn-sm" style="background:#1d4ed8;color:#fff" onclick="exportTableFiltrado('bodegas',window._bRows,window.bFiltros)">📥 Exportar</button>
+  </div>
+  <div class="tbl-wrap" style="margin:4px 14px">
+  <table class="tbl" id="bodTbl">
+    <thead><tr><th style="width:28px"><input type="checkbox" id="bodSelAll" onchange="toggleSelAll('bod',this.checked)" style="cursor:pointer"/></th><th>Código</th><th>Descripción</th><th>CO</th><th>Ciudad</th><th>Depto</th><th>Estado</th><th></th></tr></thead>
+    <tbody id="bodTbody">`;
+  datos.forEach(r => {
+    const bEnc = encodeURIComponent(JSON.stringify({id:r.id,codigo:r.codigo,descripcion:r.descripcion,co:r.co,instalacion:r.instalacion,desc_co:r.desc_co,estado:r.estado,departamento:r.departamento,ciudad:r.ciudad,desc_departamento:r.desc_departamento,desc_ciudad:r.desc_ciudad,direccion:r.direccion,notas:r.notas}));
+    html += `<tr data-id="${r.id}" data-dirty="">
+      <td><input type="checkbox" class="bod-sel" data-id="${r.id}" style="cursor:pointer"/></td>
+      <td style="white-space:nowrap">${e(String(r.codigo||''))}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e(String(r.descripcion||''))}">${e(String(r.descripcion||''))}</td>
+      <td>${e(String(r.co||''))}</td>
+      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e(String(r.desc_ciudad||''))}">${e(String(r.desc_ciudad||''))}</td>
+      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e(String(r.desc_departamento||''))}</td>
+      <td><span class="badge ${r.estado==='Activo'?'b-ok':'b-gray'}">${e(String(r.estado||''))}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" onclick="openDetalleRow('bodegas','${bEnc}')">✏️</button>
+
+      </td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>
+  <div style="padding:8px 14px"><button class="btn btn-pr" onclick="saveBodegas()">💾 Guardar cambios</button></div>`;
+  window._bRows = rows; window.bFiltros = filtros;
+  rdr(html);
+}
+
+function markDirtyB(el) { el.closest('tr').dataset.dirty = '1'; }
+
+async function saveBodegas() {
+  const rows = document.querySelectorAll('#bodTbl tbody tr[data-dirty="1"]');
+  if (!rows.length) { toast('Sin cambios', 'wa'); return; }
+  ld('Guardando ' + rows.length + ' cambios...');
+  let ok = 0, errs = 0;
+  for (const row of rows) {
+    const id = row.dataset.id;
+    const upd = {};
+    row.querySelectorAll('[data-f]').forEach(f => { upd[f.dataset.f] = f.value; });
+    try { await sb.from('bodegas').update(upd).eq('id', id); row.dataset.dirty = ''; ok++; }
+    catch { errs++; }
+  }
+  uld();
+  toast(errs ? ok + ' ok, ' + errs + ' errores' : '✅ ' + ok + ' bodegas actualizadas', errs ? 'wa' : 'ok');
+}
+
+async function deleteBodega(id) {
+  if (!confirm('¿Eliminar esta bodega?')) return;
+  ld(); try { await sb.from('bodegas').delete().eq('id', id); uld(); toast('Eliminada'); pgTablaBodegas(); }
+  catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function openNuevaBodega() {
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="nbModal" style="display:flex" onclick="if(event.target.id==='nbModal')event.target.remove()">
+      <div class="modal">
+        <div class="modal-hdl"></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px">➕ Nueva bodega</div>
+        <span class="inp-label">Código</span><input id="nbCod" class="inp" placeholder="Ej: 03001"/>
+        <span class="inp-label">Descripción</span><input id="nbDesc" class="inp" placeholder="Nombre de la bodega"/>
+        <span class="inp-label">CO</span><input id="nbCo" class="inp" value="${G.co.id}" placeholder="003"/>
+        <span class="inp-label">Ciudad</span><input id="nbCiu" class="inp" placeholder="Ej: Bogotá"/>
+        <span class="inp-label">Departamento</span><input id="nbDep" class="inp" placeholder="Ej: Cundinamarca"/>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('nbModal').remove()">Cancelar</button>
+          <button class="btn btn-ok" style="flex:1" onclick="saveNuevaBodega()">Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function saveNuevaBodega() {
+  const cod  = document.getElementById('nbCod').value.trim();
+  const desc = document.getElementById('nbDesc').value.trim();
+  const co   = document.getElementById('nbCo').value.trim();
+  const ciu  = document.getElementById('nbCiu').value.trim();
+  const dep  = document.getElementById('nbDep').value.trim();
+  if (!cod) { toast('El código es obligatorio', 'wa'); return; }
+  ld();
+  try {
+    await sb.from('bodegas').insert([{ codigo: cod, descripcion: desc, co, desc_ciudad: ciu, desc_departamento: dep, estado: 'Activo' }]);
+    document.getElementById('nbModal')?.remove(); uld(); toast('✅ Bodega creada');
+    pgTablaBodegas();
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+async function handleBodegasFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  ld('Procesando bodegas...');
+  try {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const records = rows.map(r => ({
+      codigo:            txt(r['Código']            || r['CODIGO']            || ''),
+      descripcion:       txt(r['Descripción']       || r['DESCRIPCION']       || ''),
+      co:                txt(r['C.O.']              || r['CO']                || ''),
+      instalacion:       txt(r['Instalación']       || r['INSTALACION']       || '') || null,
+      desc_co:           txt(r['Descripción C.O.']  || r['DESC_CO']           || ''),
+      estado:            txt(r['Estado']            || r['ESTADO']            || 'Activo'),
+      // departamento y ciudad vienen como número en el Excel — guardar como texto
+      departamento:      txt(r['Departamento']      || r['DEPARTAMENTO']      || '') || null,
+      ciudad:            txt(r['ciudad']            || r['CIUDAD']            || '') || null,
+      desc_departamento: txt(r['Desc. Departamento']|| r['DESC_DEPARTAMENTO'] || ''),
+      desc_ciudad:       txt(r['Desc. Ciudad']      || r['DESC_CIUDAD']       || ''),
+      direccion:         txt(r['Dirección-1']       || r['DIRECCION']         || ''),
+      notas:             txt(r['Notas']             || '') || null,
+    })).filter(r => r.codigo && r.co);
+    if (!records.length) { uld(); toast('Sin datos válidos', 'er'); return; }
+    ld('Actualizando ' + records.length + ' bodegas...');
+    let upsOk = 0, upsErr = 0, errMsg = '';
+    for (let i = 0; i < records.length; i += 100) {
+      try {
+        await sb.from('bodegas').upsert(records.slice(i, i+100), 'codigo');
+        upsOk += Math.min(100, records.length - i);
+      } catch(e) {
+        const batchErr = Math.min(100, records.length - i);
+        upsErr += batchErr;
+        errMsg = e.message;
+        console.error('Upsert batch', i, ':', e.message);
+      }
+    }
+    uld();
+    const bMsg = upsErr > 0
+      ? upsOk + ' actualizadas, ' + upsErr + ' errores: ' + errMsg.substring(0,80)
+      : upsOk + ' bodegas actualizadas';
+    toast(upsErr > 0 ? bMsg : '✅ ' + bMsg, upsErr > 0 ? 'wa' : 'ok');
+    logImportacion('bodegas', upsOk, upsErr>0?'parcial':'exito', upsOk+' bodegas actualizadas', upsErr, upsErr>0?errMsg:'');
+    pgTablaBodegas();
+  } catch(err) {
+    uld();
+    toast('Error: ' + err.message, 'er');
+    logImportacion('bodegas', 0, 'error', 'Fallo total', 0, err.message);
+    console.error('handleBodegasFile:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SUPERVISOR
+// ═══════════════════════════════════════════════════════════
+function pgSupervisor() {
+  $fab.style.display = 'none';
+  rdr(`<div class="hdr">
+    <button class="hdr-btn" onclick="pgSelectPerfil()">← Perfil</button>
+    <h1>👔 Supervisor</h1>
+    <button class="hdr-btn" onclick="cerrarSesion()" style="background:rgba(255,255,255,0.15)">🚪 Salir</button>
+  </div>
+  <div style="padding:12px">
+    ${adminCard('📊','Dashboard','Avance en vivo por zona y alistador','pgDashboard()')}
+    ${adminCard('👁️','Supervisión en vivo','Quién está en qué zona ahora mismo','pgSupervisionVivo()')}
+    ${adminCard('📦','Pedidos','Ver, filtrar y gestionar pedidos','pgTablaPedidos()')}
+    ${adminCard('🔄','Requisiciones','Ver, filtrar y gestionar requisiciones','pgTablaRequisiciones()')}
+    ${adminCard('📈','Historial de alistamientos','Alistamientos anteriores con fechas','pgHistorialAlistamientos()')}
+    ${adminCard('📋','Log de importaciones','Historial de cargas','pgLogImportaciones()')}
+  </div>`);
+}
+
+// ── Tabla Pedidos ────────────────────────────────────────────
+async function pgTablaPedidos() {
+  ld('Cargando pedidos...');
+  try {
+    const rows = await sb.from('pedidos').select('*').eq('co', G.co.id).order('fecha_entrega', true);
+    uld(); renderTablaPedidos(Array.isArray(rows) ? rows : []);
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function renderTablaPedidos(rows, filtros = {}) {
+  const estadoOpts = [...new Set(rows.map(r => r.estado_movto).filter(Boolean))].sort();
+  const bodOpts    = [...new Set(rows.map(r => r.bodega).filter(Boolean))].sort();
+  const prepOpts   = ['todos','pendiente','parcial','completo'];
+  let datos = rows;
+  if (filtros.doc)    datos = datos.filter(r => String(r.nro_documento||'').toLowerCase().includes(filtros.doc.toLowerCase()));
+  if (filtros.ref)    datos = datos.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+  if (filtros.bod)    datos = datos.filter(r => r.bodega === filtros.bod);
+  if (filtros.est)    datos = datos.filter(r => r.estado_movto === filtros.est);
+  if (filtros.prep && filtros.prep !== 'todos') datos = datos.filter(r => r.estado_prep === filtros.prep);
+
+  const total = datos.length;
+  const compl = datos.filter(r => r.estado_prep === 'completo').length;
+  const parc  = datos.filter(r => r.estado_prep === 'parcial').length;
+  const pend  = datos.filter(r => !r.estado_prep || r.estado_prep === 'pendiente').length;
+
+  let html = `<div class="hdr">
+    <button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>
+    <h1>📦 Pedidos CO ${G.co.id}</h1>
+    <span class="hdr-sub">${total}</span>
+  </div>
+  <div style="padding:6px 14px;display:flex;gap:8px;flex-wrap:wrap;background:var(--surf);border-bottom:1px solid var(--bord)">
+    <label class="file-btn" style="background:var(--ok);width:auto;padding:6px 12px;font-size:12px;margin-top:0">📂 Cargar Excel<input type="file" accept=".xlsx,.xls" onchange="handlePedidosFile(event)"/></label>
+    <button class="btn btn-sm" style="background:#1d4ed8;color:#fff" onclick="exportTableFiltrado('pedidos',window._pRows,window.pFiltros)">📥 Exportar</button>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-n" style="color:var(--ok)">${compl}</div><div class="stat-l">✅ Completos</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:var(--wa)">${parc}</div><div class="stat-l">⏳ Parciales</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:var(--mut)">${pend}</div><div class="stat-l">⬜ Pendientes</div></div>
+  </div>
+  <div class="filter-bar">
+    <input id="pf1" placeholder="🔍 Documento" value="${e(filtros.doc||'')}" oninput="window.pFiltros.doc=this.value;refreshPedidosTbody(window._pRows,window.pFiltros)"/>
+    <input id="pf2" placeholder="🔍 Referencia" value="${e(filtros.ref||'')}" oninput="window.pFiltros.ref=this.value;refreshPedidosTbody(window._pRows,window.pFiltros)"/>
+    <select onchange="window.pFiltros.bod=this.value;refreshPedidosTbody(window._pRows,window.pFiltros)">
+      <option value="">Todas las bodegas</option>
+      ${bodOpts.map(b=>`<option value="${e(b)}" ${filtros.bod===b?'selected':''}>${e(b)}</option>`).join('')}
+    </select>
+    <select onchange="window.pFiltros.est=this.value;refreshPedidosTbody(window._pRows,window.pFiltros)">
+      <option value="">Todos los estados</option>
+      ${estadoOpts.map(s=>`<option value="${e(s)}" ${filtros.est===s?'selected':''}>${e(s)}</option>`).join('')}
+    </select>
+    <select onchange="window.pFiltros.prep=this.value;refreshPedidosTbody(window._pRows,window.pFiltros)">
+      ${prepOpts.map(p=>`<option value="${p}" ${filtros.prep===p?'selected':''}>${p==='todos'?'Toda preparación':p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+    </select>
+  </div>
+  <div class="tbl-wrap" style="margin:4px 14px">
+  <table class="tbl">
+    <thead><tr><th style="width:28px"><input type="checkbox" id="pedSelAll" onchange="toggleSelAll('ped',this.checked)" style="cursor:pointer"/></th><th>Documento</th><th>Ref.</th><th>Descripción</th><th>Bodega</th><th>Ciudad</th><th>Cant.</th><th>F.Entrega</th><th>Prep.</th><th></th></tr></thead>
+    <tbody id="pedTbody">`;
+
+  // Initial render delegates to refreshPedidosTbody after render
+  html += `</tbody></table></div>`;
+  window._pRows = rows; window.pFiltros = filtros;
+  rdr(html);
+  refreshPedidosTbody(rows, filtros);
+}
+
+function refreshPedidosTbody(rows, filtros) {
+  window._pRows = rows; window.pFiltros = filtros;
+  let datos = rows;
+  if (filtros.doc)  datos = datos.filter(r => String(r.nro_documento||'').toLowerCase().includes(filtros.doc.toLowerCase()));
+  if (filtros.ref)  datos = datos.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+  if (filtros.bod)  datos = datos.filter(r => r.bodega === filtros.bod);
+  if (filtros.est)  datos = datos.filter(r => r.estado_movto === filtros.est);
+  if (filtros.prep && filtros.prep !== 'todos') datos = datos.filter(r => r.estado_prep === filtros.prep);
+  const tbody = document.getElementById('pedTbody');
+  if (!tbody) { renderTablaPedidos(rows, filtros); return; }
+  const countEl = document.getElementById('pedCount');
+  if (countEl) countEl.textContent = datos.length + ' de ' + rows.length;
+  let tbHtml = '';
+  datos.slice(0, 500).forEach(r => {
+    const prep = r.estado_prep || 'pendiente';
+    const prepCls = prep === 'completo' ? 'b-ok' : prep === 'parcial' ? 'b-wa' : 'b-gray';
+    const pEnc = encodeURIComponent(JSON.stringify({id:r.id,nro_documento:r.nro_documento,referencia:r.referencia,desc_item:r.desc_item,bodega:r.bodega,desc_ciudad:r.desc_ciudad,cant_comprometida:r.cant_comprometida,um_emp:r.um_emp,estado_movto:r.estado_movto,estado_prep:r.estado_prep,motivo:r.motivo,co:r.co,fecha_entrega:r.fecha_entrega}));
+    tbHtml += `<tr data-id="${r.id}">
+      <td><input type="checkbox" class="ped-sel" data-id="${r.id}" style="cursor:pointer"/></td>
+      <td style="white-space:nowrap">${e(String(r.nro_documento||''))}</td>
+      <td>${e(String(r.referencia||''))}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e(String(r.desc_item||''))}">${e(String(r.desc_item||''))}</td>
+      <td>${e(String(r.bodega||''))}</td>
+      <td>${e(String(r.desc_ciudad||''))}</td>
+      <td style="text-align:right">${fmtn(r.cant_comprometida)}</td>
+      <td style="white-space:nowrap">${e(String(r.fecha_entrega||'').substring(0,10))}</td>
+      <td><span class="badge ${prepCls}">${prep}</span></td>
+      <td><button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" onclick="openDetalleRow('pedidos','${pEnc}')">✏️</button></td>
+    </tr>`;
+  });
+  if (datos.length > 500) tbHtml += `<tr><td colspan="8" style="text-align:center;color:var(--mut)">... y ${datos.length-500} más</td></tr>`;
+  tbody.innerHTML = tbHtml;
+}
+
+async function handlePedidosFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  ld('Procesando pedidos...');
+  try {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const records = rows.map(r => ({
+      zona_logistica:    txt(r['Zona Logistica']            || ''),
+      grupo_shopper:     txt(r['GRUPO SHOPPER']             || ''),
+      grupo:             txt(r['GRUPO']                     || ''),
+      desc_suc_factura:  txt(r['Desc. sucursal factura']    || ''),
+      desc_suc_despacho: txt(r['Desc. sucursal despacho']   || ''),
+      nro_documento:     txt(r['Nro documento']             || ''),
+      fecha:             fecha(r['Fecha']                   || ''),
+      fecha_entrega:     fecha(r['Fecha entrega']           || ''),
+      bodega:            txt(r['Bodega']                    || ''),
+      motivo:            txt(r['Motivo']                    || ''),
+      desc_motivo:       txt(r['Desc. motivo']              || ''),
+      referencia:        txt(r['Referencia']                || ''),
+      codigo_barra:      txt(r['Codigo barra principal']    || ''),
+      desc_item:         txt(r['Desc. item']                || ''),
+      cant_comprometida: num(r['Cant. comprom.']            || 0),
+      estado_movto:      txt(r['Estado movto.']             || ''),
+      estado_docto:      txt(r['Estado docto.']             || ''),
+      um_emp:            txt(r['U.M. emp.']                 || ''),
+      um:                txt(r['U.M.']                      || ''),
+      co:                txt(r['C.O.']                      || ''),
+      desc_ciudad:       txt(r['Desc. ciudad']              || ''),
+      direccion:         txt(r['Direccion 1']               || ''),
+      tipo_docto:        txt(r['Tipo docto.']               || ''),
+      nro_docto_ref:     txt(r['Docto. referencia']         || ''),
+      orden_interno:     txt(r['Orden interno']             || ''),
+      nombre_vendedor:   txt(r['Nombre vendedor']           || ''),
+      razon_social:      txt(r['Razon social cliente despacho'] || ''),
+      notas:             txt(r['Notas docto']               || ''),
+      estado_prep:       'pendiente',
+    })).filter(r => r.nro_documento && r.referencia && r.co);
+
+    if (!records.length) { uld(); toast('Sin datos válidos', 'er'); return; }
+    ld(`Cargando ${records.length} pedidos...`);
+    // Borrar pedidos existentes del CO
+    const coVal = records[0].co;
+    ld('Eliminando pedidos anteriores del CO ' + coVal + '...');
+    try { await sb.from('pedidos').delete().eq('co', coVal); } catch {}
+    for (let i = 0; i < records.length; i += 100) {
+      await sb.from('pedidos').insert(records.slice(i, i+100));
+    }
+    uld(); toast('✅ ' + records.length + ' pedidos cargados');
+    logImportacion('pedidos', pOk, pErr>0?'parcial':'exito', pOk+' pedidos actualizados', pErr, pErr>0?pErrMsg:'');
+    pgSupervisor();
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+// ── Tabla Requisiciones ──────────────────────────────────────
+async function pgTablaRequisiciones() {
+  ld('Cargando requisiciones...');
+  try {
+    const rows = await sb.from('requisiciones').select('*').eq('co', G.co.id).order('fecha_entrega', true);
+    uld(); renderTablaRequisiciones(Array.isArray(rows) ? rows : []);
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function renderTablaRequisiciones(rows, filtros = {}) {
+  const bodOpts  = [...new Set(rows.map(r => r.bodega).filter(Boolean))].sort();
+  const prepOpts = ['todos','pendiente','parcial','completo'];
+  let datos = rows;
+  if (filtros.doc)  datos = datos.filter(r => String(r.nro_documento||'').toLowerCase().includes(filtros.doc.toLowerCase()));
+  if (filtros.ref)  datos = datos.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+  if (filtros.bod)  datos = datos.filter(r => r.bodega === filtros.bod);
+  if (filtros.prep && filtros.prep !== 'todos') datos = datos.filter(r => r.estado_prep === filtros.prep);
+
+  const compl = datos.filter(r => r.estado_prep === 'completo').length;
+  const parc  = datos.filter(r => r.estado_prep === 'parcial').length;
+  const pend  = datos.filter(r => !r.estado_prep || r.estado_prep === 'pendiente').length;
+
+  let html = `<div class="hdr">
+    <button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>
+    <h1>🔄 Requisiciones CO ${G.co.id}</h1>
+    <span class="hdr-sub">${datos.length}</span>
+  </div>
+  <div style="padding:6px 14px;display:flex;gap:8px;flex-wrap:wrap;background:var(--surf);border-bottom:1px solid var(--bord)">
+    <label class="file-btn" style="background:#0f766e;width:auto;padding:6px 12px;font-size:12px;margin-top:0">📂 Cargar Excel<input type="file" accept=".xlsx,.xls" onchange="handleRequisicionesFile(event)"/></label>
+    <button class="btn btn-sm" style="background:#6d28d9;color:#fff" onclick="exportTableFiltrado('requisiciones',window._rqRows,window.rFiltros)">📥 Exportar</button>
+    <button class="btn btn-sm btn-er" onclick="eliminarSeleccionados('req','requisiciones')">🗑 Eliminar seleccionados</button>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-n" style="color:var(--ok)">${compl}</div><div class="stat-l">✅ Completas</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:var(--wa)">${parc}</div><div class="stat-l">⏳ Parciales</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:var(--mut)">${pend}</div><div class="stat-l">⬜ Pendientes</div></div>
+  </div>
+  <div class="filter-bar">
+    <input id="rf1" placeholder="🔍 Documento" value="${e(filtros.doc||'')}" oninput="window.rFiltros.doc=this.value;refreshReqTbody(window._rqRows,window.rFiltros)"/>
+    <input id="rf2" placeholder="🔍 Referencia" value="${e(filtros.ref||'')}" oninput="window.rFiltros.ref=this.value;refreshReqTbody(window._rqRows,window.rFiltros)"/>
+    <select onchange="window.rFiltros.bod=this.value;refreshReqTbody(window._rqRows,window.rFiltros)">
+      <option value="">Todas las bodegas</option>
+      ${bodOpts.map(b=>`<option value="${e(b)}" ${filtros.bod===b?'selected':''}>${e(b)}</option>`).join('')}
+    </select>
+    <select onchange="window.rFiltros.prep=this.value;refreshReqTbody(window._rqRows,window.rFiltros)">
+      ${prepOpts.map(p=>`<option value="${p}" ${filtros.prep===p?'selected':''}>${p==='todos'?'Toda preparación':p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+    </select>
+  </div>
+  <div class="tbl-wrap" style="margin:4px 14px">
+  <table class="tbl">
+    <thead><tr><th style="width:28px"><input type="checkbox" id="reqSelAll" onchange="toggleSelAll('req',this.checked)" style="cursor:pointer"/></th><th>Documento</th><th>Ref.</th><th>Descripción</th><th>Bodega</th><th>F.Entrega</th><th>Cant.</th><th>Prep.</th><th></th></tr></thead>
+    <tbody id="reqTbody">`;
+  datos.slice(0, 500).forEach(r => {
+    const prep = r.estado_prep || 'pendiente';
+    const prepCls = prep === 'completo' ? 'b-ok' : prep === 'parcial' ? 'b-wa' : 'b-gray';
+    html += `<tr>
+      <td style="white-space:nowrap">${e(String(r.nro_documento||''))}</td>
+      <td>${e(String(r.referencia||''))}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e(String(r.desc_item||''))}</td>
+      <td>${e(String(r.bodega||''))}</td>
+      <td>${e(String(r.fecha_entrega||'').substring(0,10))}</td>
+      <td style="text-align:right">${fmtn(r.cant_comprometida)}</td>
+      <td><span class="badge ${prepCls}">${prep}</span></td>
+    </tr>`;
+  });
+  if (datos.length > 500) html += `<tr><td colspan="7" style="text-align:center;color:var(--mut)">... y ${datos.length-500} más</td></tr>`;
+  html += `</tbody></table></div>`;
+  window._rqRows = rows; window.rFiltros = filtros;
+  rdr(html);
+}
+function refreshReqTbody(rows, filtros) {
+  window._rqRows = rows; window.rFiltros = filtros;
+  let datos = rows;
+  if (filtros.doc)  datos = datos.filter(r => String(r.nro_documento||'').toLowerCase().includes(filtros.doc.toLowerCase()));
+  if (filtros.ref)  datos = datos.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+  if (filtros.bod)  datos = datos.filter(r => r.bodega === filtros.bod);
+  if (filtros.prep && filtros.prep !== 'todos') datos = datos.filter(r => r.estado_prep === filtros.prep);
+  const tbody = document.getElementById('reqTbody');
+  if (!tbody) { renderTablaRequisiciones(rows, filtros); return; }
+  let tbHtml = '';
+  datos.slice(0, 500).forEach(r => {
+    const prep = r.estado_prep || 'pendiente';
+    const prepCls = prep === 'completo' ? 'b-ok' : prep === 'parcial' ? 'b-wa' : 'b-gray';
+    const rqEnc = encodeURIComponent(JSON.stringify({id:r.id,nro_documento:r.nro_documento,referencia:r.referencia,desc_item:r.desc_item,bodega:r.bodega,bodega_entrada:r.bodega_entrada,bodega_salida:r.bodega_salida,cant_comprometida:r.cant_comprometida,um:r.um,estado_movto:r.estado_movto,estado_prep:r.estado_prep,motivo:r.motivo,co:r.co,fecha_entrega:r.fecha_entrega}));
+    tbHtml += '<tr data-id="' + r.id + '">' +
+      '<td><input type="checkbox" class="req-sel" data-id="' + r.id + '" style="cursor:pointer"/></td>' +
+      '<td style="white-space:nowrap">' + e(String(r.nro_documento||'')) + '</td>' +
+      '<td>' + e(String(r.referencia||'')) + '</td>' +
+      '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + e(String(r.desc_item||'')) + '">' + e(String(r.desc_item||'')) + '</td>' +
+      '<td>' + e(String(r.bodega||'')) + '</td>' +
+      '<td>' + e(String(r.fecha_entrega||'').substring(0,10)) + '</td>' +
+      '<td style="text-align:right">' + fmtn(r.cant_comprometida) + '</td>' +
+      '<td><span class="badge ' + prepCls + '">' + prep + '</span></td>' +
+      '<td><button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" data-tbl="requisiciones" data-enc="' + rqEnc.replace(/"/g,"&quot;") + '" onclick="openDetalleRow(this.dataset.tbl,this.dataset.enc)">✏️</button></td>' +
+      '</tr>';
+  });
+  if (datos.length > 500) tbHtml += '<tr><td colspan="7" style="text-align:center;color:var(--mut)">... y ' + (datos.length-500) + ' más</td></tr>';
+  tbody.innerHTML = tbHtml;
+}
+
+async function handleRequisicionesFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  ld('Procesando requisiciones...');
+  try {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const records = rows.map(r => {
+      const nroDoc = txt(r['Nro documento'] || '');
+      // CO viene del prefijo del número de documento: "073-RQT-00001559" → "073"
+      const coFromDoc = nroDoc.match(/^(\d+)-/) ? nroDoc.match(/^(\d+)-/)[1] : '';
+      const coField   = txt(r['C.O. movto.'] || r['C.O.'] || '');
+      const co        = coFromDoc || coField;
+      const bodSalida = txt(r['Bodega salida'] || '');
+      const bodEntrada= txt(r['Bodega entrada'] || '');
+      return {
+        nro_documento:     nroDoc,
+        referencia_docto:  txt(r['Referencia Docto.']          || ''),
+        fecha_docto:       fecha(r['Fecha docto']              || ''),
+        fecha_entrega:     fecha(r['Fecha de entrega movto.']  || ''),
+        notas:             txt(r['Notas docto']                || ''),
+        referencia:        txt(r['Referencia']                 || ''),
+        desc_item:         txt(r['Desc. item']                 || ''),
+        bodega:            bodSalida,           // bodega de despacho = salida
+        bodega_entrada:    bodEntrada,
+        bodega_salida:     bodSalida,
+        nro_registro:      txt(r['Nro. registro']              || ''),
+        ubicacion_entrada: txt(r['Ubicación entrada']          || ''),
+        um:                txt(r['U.M. ']  || r['U.M.']        || ''),
+        um_emp:            txt(r['U.M. Emp.']                  || ''),
+        codigo_barra:      txt(r['Código barras principal']    || ''),
+        cant_comprometida: num(r['Cant. comprometida']         || 0),
+        motivo:            txt(r['Motivo']                     || ''),
+        estado_movto:      txt(r['Estado movto.']              || ''),
+        estado_docto:      txt(r['Estado docto.']              || ''),
+        co,
+        grupo:             txt(r['GRUPO']                      || ''),
+        grupo_shopper:     txt(r['GRUPO SHOPPER']              || ''),
+        desc_co:           txt(r['Desc. C.O. movto.']          || ''),
+        estado_prep:       'pendiente',
+      };
+    }).filter(r => r.nro_documento && r.referencia && r.co);
+
+    if (!records.length) { uld(); toast('Sin datos válidos', 'er'); return; }
+    const coVal = records[0].co;
+    ld('Actualizando ' + records.length + ' requisiciones CO ' + coVal + '...');
+    let rOk = 0, rErr = 0, rErrMsg = '';
+    for (let i = 0; i < records.length; i += 100) {
+      try {
+        await sb.from('requisiciones').upsert(records.slice(i, i+100), 'nro_documento,referencia,bodega');
+        rOk += Math.min(100, records.length - i);
+      } catch(e) {
+        rErr += Math.min(100, records.length - i);
+        rErrMsg = e.message;
+        console.error('Req upsert batch', i, ':', e.message);
+      }
+    }
+    uld();
+    const rMsg = rErr > 0 ? rOk + ' ok, ' + rErr + ' errores: ' + rErrMsg.substring(0,80) : rOk + ' requisiciones actualizadas';
+    toast(rErr > 0 ? rMsg : '✅ ' + rMsg, rErr > 0 ? 'wa' : 'ok');
+    logImportacion('requisiciones', rOk, rErr>0?'parcial':'exito', rOk+' requisiciones actualizadas', rErr, rErr>0?rErrMsg:'');
+    // Auto-populate zonas with new ref+bodega combinations
+    autoPopularZonas(records, 'requisiciones');
+    pgSupervisor();
+  } catch(err) {
+    uld();
+    toast('Error: ' + err.message, 'er');
+    logImportacion('requisiciones', 0, 'error', 'Fallo total', 0, err.message);
+  }
+}
+
+
+
+// ── Detalle/edición de fila ──────────────────────────────────
+function openDetalleRow(tabla, rowData) {
+  const row = typeof rowData === 'string' ? JSON.parse(decodeURIComponent(rowData)) : rowData;
+  const campos = Object.entries(row).filter(([k]) => !k.startsWith('_') && k !== 'id');
+  const boolFields = ['desglosar_oferta','activo','lotes','multiubicaciones'];
+  let formHtml = '';
+  campos.forEach(([k, v]) => {
+    const label = k.replace(/_/g,' ').toUpperCase();
+    if (boolFields.includes(k)) {
+      formHtml += `<span class="inp-label">${label}</span>
+        <label class="tog" style="margin:6px 0 10px;display:block">
+          <input type="checkbox" id="dr_${k}" ${v?'checked':''}/>
+          <span class="tog-sl"></span>
+        </label>`;
+    } else {
+      formHtml += `<span class="inp-label">${label}</span>
+        <input id="dr_${k}" class="inp" value="${e(String(v||''))}" style="margin-bottom:4px"/>`;
+    }
+  });
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="detalleModal" style="display:flex" onclick="if(event.target.id==='detalleModal')event.target.remove()">
+      <div class="modal" style="max-height:92vh">
+        <div class="modal-hdl"></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px">✏️ Editar registro — ${tabla}</div>
+        ${formHtml}
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('detalleModal').remove()">Cancelar</button>
+          <button class="btn btn-pr" style="flex:1;color:var(--gold)" onclick="saveDetalleRow('${tabla}','${row.id}')">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function saveDetalleRow(tabla, id) {
+  const modal = document.getElementById('detalleModal');
+  if (!modal) return;
+  const inputs = modal.querySelectorAll('[id^="dr_"]');
+  const upd = {};
+  inputs.forEach(inp => {
+    const key = inp.id.replace('dr_', '');
+    upd[key] = inp.type === 'checkbox' ? inp.checked : inp.value;
+  });
+  ld('Guardando...');
+  try {
+    await sb.from(tabla).update(upd).eq('id', id);
+    modal.remove();
+    uld(); toast('✅ Cambio guardado');
+    // Reload current table
+    if (tabla==='bodegas') pgTablaBodegas();
+    else if (tabla==='zonas') pgTablaZonas();
+    else if (tabla==='usuarios') pgTablaUsuarios();
+    else if (tabla==='kits') pgTablaKits();
+    else if (tabla==='pedidos') pgTablaPedidos();
+    else if (tabla==='requisiciones') pgTablaRequisiciones();
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTO-POPULAR ZONAS
+// Inserta combinaciones ref+bodega que no existan en zonas
+// ═══════════════════════════════════════════════════════════════
+async function autoPopularZonas(records, tipo) {
+  try {
+    // Get existing zona keys for this CO
+    const existing = await sb.from('zonas').select('referencia,bodega_id,co').eq('co', G.co.id);
+    const existKeys = new Set(
+      (Array.isArray(existing) ? existing : []).map(z => z.referencia + '|' + z.bodega_id + '|' + z.co)
+    );
+    // Build new unique ref+bodega+co combos from incoming records
+    const seen = new Set();
+    const nuevas = [];
+    records.forEach(r => {
+      const ref  = txt(r.referencia || '');
+      const bod  = tipo === 'requisiciones' ? txt(r.bodega_salida || r.bodega || '') : txt(r.bodega || '');
+      const co   = txt(r.co || G.co.id);
+      const desc = txt(r.desc_item || '');
+      if (!ref || !bod || !co) return;
+      const key = ref + '|' + bod + '|' + co;
+      if (!seen.has(key) && !existKeys.has(key)) {
+        seen.add(key);
+        nuevas.push({ referencia: ref, descripcion: desc, bodega_id: bod, co, zona: 'SIN ZONA', secuencia: null, desglosar_oferta: false });
+      }
+    });
+    if (!nuevas.length) return;
+    for (let i = 0; i < nuevas.length; i += 100) {
+      await sb.from('zonas').insert(nuevas.slice(i, i+100));
+    }
+    console.log('Auto-populated zonas:', nuevas.length, 'nuevas referencias');
+    toast('ℹ️ ' + nuevas.length + ' referencias nuevas agregadas a Zonas (sin zona asignada)', 'wa');
+  } catch(e) {
+    console.warn('autoPopularZonas error:', e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ALISTADOR
+// ═══════════════════════════════════════════════════════════
+let _alItems = [];     // items del picking actual
+let _alZona  = null;   // zona activa
+let _alTipo  = null;   // 'pedidos' | 'requisiciones'
+let _kitsMap = {};
+
+async function pgAlistador() {
+  ld('Cargando...');
+  try {
+    // Cargar pedidos + requisiciones del CO
+    const [ped, req, kits] = await Promise.all([
+      sb.from('pedidos').select('id,nro_documento,referencia,desc_item,bodega,desc_ciudad,zona_logistica,cant_comprometida,um_emp,estado_prep,motivo,cant_alistada,co').eq('co', G.co.id),
+      sb.from('requisiciones').select('id,nro_documento,referencia,desc_item,bodega,cant_comprometida,um,estado_prep,motivo,cant_alistada,co').eq('co', G.co.id),
+      sb.from('kits').select('*'),
+    ]);
+    // Build kits map
+    _kitsMap = {};
+    (Array.isArray(kits) ? kits : []).forEach(k => {
+      if (!_kitsMap[k.referencia]) _kitsMap[k.referencia] = [];
+      _kitsMap[k.referencia].push({ ref: k.referencia_comp, desc: k.desc_item_comp, qty: parseFloat(k.cantidad_requerida) });
+    });
+    // Load zonas para el CO
+    const zonas = await sb.from('zonas').select('*').eq('co', G.co.id);
+    const zonaMap = {};
+    (Array.isArray(zonas) ? zonas : []).forEach(z => { zonaMap[String(z.referencia) + '|' + String(z.bodega_id)] = z; });
+
+    // Enrich items with zona info and consolidate by referencia+bodega+tipo
+    const enrichOne = (it, tipo) => {
+      const key = String(it.referencia) + '|' + String(it.bodega);
+      const z = zonaMap[key] || {};
+      return { ...it, _tipo: tipo, _zona: z.zona || 'SIN ZONA', _seq: z.secuencia || 9999, _desglosar: z.desglosar_oferta || false };
+    };
+    const allRaw = [
+      ...(Array.isArray(ped) ? ped : []).map(i => enrichOne(i, 'pedidos')),
+      ...(Array.isArray(req) ? req : []).map(i => enrichOne(i, 'requisiciones')),
+    ];
+
+    // Consolidate: group by referencia+bodega, sum quantities
+    // Each group has _items[] (originals) and cant_total (sum)
+    const groupMap = {};
+    allRaw.forEach(it => {
+      const gk = it.referencia + '|' + it.bodega + '|' + it._tipo;
+      if (!groupMap[gk]) {
+        groupMap[gk] = {
+          ...it,
+          cant_total: 0,
+          cant_alistada_total: 0,
+          _items: [],
+          // Group estado: completo only if ALL done, parcial if some done, else pendiente
+          estado_prep: 'pendiente',
+        };
+      }
+      groupMap[gk].cant_total += (parseFloat(it.cant_comprometida) || 0);
+      groupMap[gk].cant_alistada_total += (parseFloat(it.cant_alistada) || 0);
+      groupMap[gk]._items.push(it);
+    });
+
+    // Compute group estado_prep
+    Object.values(groupMap).forEach(g => {
+      const total = g._items.length;
+      const comp  = g._items.filter(i => i.estado_prep === 'completo').length;
+      const parc  = g._items.filter(i => i.estado_prep === 'parcial').length;
+      if (comp === total) g.estado_prep = 'completo';
+      else if (comp > 0 || parc > 0) g.estado_prep = 'parcial';
+      else g.estado_prep = 'pendiente';
+    });
+
+    _alItems = Object.values(groupMap).sort((a,b) => a._seq - b._seq);
+    uld();
+    pgAlistadorHome();
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+function pgAlistadorHome() {
+  $fab.style.display = 'none';
+  const total = _alItems.length;
+  const compl = _alItems.filter(i => i.estado_prep === 'completo').length;
+  const parc  = _alItems.filter(i => i.estado_prep === 'parcial').length;
+  const pend  = _alItems.filter(i => !i.estado_prep || i.estado_prep === 'pendiente').length;
+  const pct   = total ? Math.round((compl + parc) / total * 100) : 0;
+
+  // Group by zona
+  const zonas = {};
+  _alItems.forEach(i => {
+    const z = i._zona || 'SIN ZONA';
+    if (!zonas[z]) zonas[z] = { total: 0, done: 0, seq: i._seq };
+    zonas[z].total++;
+    if (i.estado_prep === 'completo' || i.estado_prep === 'parcial') zonas[z].done++;
+  });
+  const zonaList = Object.entries(zonas).sort((a, b) => a[1].seq - b[1].seq);
+
+  let html = `<div class="hdr">
+    <button class="hdr-btn" onclick="pgSelectPerfil()">← Perfil</button>
+    <div style="flex:1"><div style="font-weight:700;font-size:15px">📋 Alistador — CO ${G.co.id}</div>
+    <div style="font-size:11px;opacity:.85">${G.co.nombre} · ${pct}% avance</div></div>
+    <button class="hdr-btn" onclick="abrirBuscador()" style="background:rgba(255,255,255,0.15)">🔍</button>
+    <button class="hdr-btn" onclick="cerrarSesion()" style="background:rgba(255,255,255,0.15)">🚪</button>
+  </div>
+  <div style="padding:8px 14px 0">
+    <div class="prog-bg" style="height:10px"><div class="prog-fill" style="width:${pct}%"></div></div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-n" style="color:var(--ok)">${compl}</div><div class="stat-l">✅ Completos</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:var(--wa)">${parc}</div><div class="stat-l">⏳ Parciales</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:var(--mut)">${pend}</div><div class="stat-l">⬜ Pendientes</div></div>
+  </div>
+  <div style="padding:6px 14px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:12px;font-weight:700;color:var(--mut);flex:1">ZONAS DE PICKING</span>
+    <select id="alFiltroZonaLog" style="padding:5px 8px;border:1px solid var(--bord);border-radius:8px;font-size:12px;outline:none;background:#fff" onchange="renderAlZonas()">
+      <option value="">Toda Z.Logística</option>
+      ${[...new Set(_alItems.map(i=>i.zona_logistica||'').filter(Boolean))].sort().map(z=>'<option>'+e(z)+'</option>').join('')}
+    </select>
+    <select id="alFiltroZona" style="padding:5px 8px;border:1px solid var(--bord);border-radius:8px;font-size:12px;outline:none;background:#fff" onchange="renderAlZonas()">
+      <option value="">Toda zona</option>
+      ${[...new Set(_alItems.map(i=>i._zona||'SIN ZONA'))].sort().map(z=>'<option>'+e(z)+'</option>').join('')}
+    </select>
+  </div>
+  <div id="alZonaList">`;
+
+  // Zones go inside alZonaList div — close html before zones
+  html += '</div>'; // closes alZonaList
+  // We pre-populate it via renderAlZonas after render
+
+  if (zonaList.length === 0) {
+    // Will show via renderAlZonas
+  }
+  rdr(html);
+  // Initialize filters
+  window._alFiltroLog = ''; window._alFiltroZona = '';
+  renderAlZonas();
+  // Restore filters if they exist
+  if (window._alFiltroLog) { const s = document.getElementById('alFiltroZonaLog'); if(s) s.value = window._alFiltroLog; }
+  if (window._alFiltroZona) { const s = document.getElementById('alFiltroZona'); if(s) s.value = window._alFiltroZona; }
+}
+
+function renderAlZonas() {
+  window._alFiltroLog  = document.getElementById('alFiltroZonaLog')?.value || '';
+  window._alFiltroZona = document.getElementById('alFiltroZona')?.value || '';
+  // Filter items by the selected filters
+  let filtered = _alItems;
+  if (window._alFiltroLog)  filtered = filtered.filter(i => (i.zona_logistica||'') === window._alFiltroLog);
+  if (window._alFiltroZona) filtered = filtered.filter(i => (i._zona||'SIN ZONA') === window._alFiltroZona);
+  // Rebuild zone groups from filtered items
+  const zonas = {};
+  filtered.forEach(i => {
+    const z = i._zona || 'SIN ZONA';
+    if (!zonas[z]) zonas[z] = { total: 0, done: 0, seq: i._seq };
+    zonas[z].total++;
+    if (i.estado_prep === 'completo' || i.estado_prep === 'parcial') zonas[z].done++;
+  });
+  const zonaList = Object.entries(zonas).sort((a,b) => a[1].seq - b[1].seq);
+  let html = '';
+  zonaList.forEach(([zona, info]) => {
+    const zPct = info.total ? Math.round(info.done/info.total*100) : 0;
+    const allDone = info.done === info.total;
+    html += '<div class="list-item" style="' + (allDone?'opacity:.6':'') + '" onclick="pgZonaItems(\'' + encodeURIComponent(zona) + '\')">' +
+      '<div class="li-icon">' + (allDone?'✅':'📦') + '</div>' +
+      '<div class="li-body">' +
+        '<div class="li-name">' + e(zona) + '</div>' +
+        '<div class="li-sub">' + info.total + ' referencias · ' + zPct + '%</div>' +
+        '<div class="prog-bg" style="height:4px;margin-top:4px"><div class="prog-fill" style="width:' + zPct + '%"></div></div>' +
+      '</div>' +
+      '<div class="li-arr">›</div></div>';
+  });
+  if (!zonaList.length) html = '<div class="card" style="text-align:center;color:var(--mut)">Sin zonas para el filtro seleccionado.</div>';
+  const cont = document.getElementById('alZonaList');
+  if (cont) cont.innerHTML = html;
+}
+
+function pgZonaItems(zonaEnc) {
+  const zona = decodeURIComponent(zonaEnc);
+  _alZona = zona;
+  const zItems = _alItems.filter(i => (i._zona || 'SIN ZONA') === zona)
+    .sort((a, b) => a._seq - b._seq);
+  const done = zItems.filter(i => i.estado_prep === 'completo' || i.estado_prep === 'parcial').length;
+  const pct  = zItems.length ? Math.round(done / zItems.length * 100) : 0;
+  $fab.style.display = 'flex';
+
+  iniciarTimerZona(zona);
+  let html = `<div class="hdr">
+    <button class="hdr-btn" onclick="detenerTimerZona();pgAlistadorHome()">← Zonas</button>
+    <div style="flex:1"><div style="font-weight:700;font-size:15px">📦 ${e(zona)}</div>
+    <div style="font-size:11px;opacity:.85">${done}/${zItems.length} · ${pct}%</div></div>
+    <div id="zonaTimerDisplay" class="timer-box">⏱ 0 min</div>
+  </div>
+  <div style="padding:4px 14px 2px;display:flex;gap:6px;background:var(--surf);border-bottom:1px solid var(--bord)">
+    <button class="btn btn-sm" style="background:var(--pr);color:var(--gold);flex:1" onclick="imprimirZona('${e(zona)}')">🖨️ Imprimir</button>
+    <button class="btn btn-sm" style="background:var(--pr);color:var(--gold);flex:1" onclick="abrirEscaner()">📷 Escanear</button>
+    ${G.perfil==='supervisor'||G.perfil==='admin'?`<button class="btn btn-sm" style="background:var(--gold);color:var(--pr);flex:1" onclick="abrirValidacionSupervisor('${encodeURIComponent(zona)}')">✅ Validar</button>`:''}
+  </div>
+  <div style="padding:4px 14px 2px"><div class="prog-bg"><div class="prog-fill" style="width:${pct}%"></div></div></div>`;
+
+  if (done === zItems.length && zItems.length > 0) {
+    html += `<div style="text-align:center;padding:16px;color:var(--ok);font-weight:700">✅ ¡Zona completada!</div>`;
+  }
+
+  zItems.forEach(item => {
+    const isDone = item.estado_prep === 'completo';
+    const isParcial = item.estado_prep === 'parcial';
+    const kits = _kitsMap[String(item.referencia)] || [];
+    const showKits = kits.length > 0 && item._desglosar;
+    let kitHtml = '';
+    if (showKits) {
+      const qty = item.cant_comprometida || 1;
+      kitHtml = `<div class="kit-box">📦 <strong>Componentes:</strong>`;
+      kits.forEach(k => { kitHtml += `<div class="kit-row"><span>${e(k.ref)} ${e(k.desc||'')}</span><span>${fmtn(k.qty * qty)} u.</span></div>`; });
+      kitHtml += `</div>`;
+    }
+    const tipoTag = item._tipo === 'pedidos' ?
+      '<span class="badge b-pr" style="font-size:10px">PED</span>' :
+      '<span class="badge b-vio" style="font-size:10px">REQ</span>';
+    const prepBadge = isDone ? '<span class="badge b-ok">✅ Completo</span>'
+                    : isParcial ? '<span class="badge b-wa">⏳ Parcial</span>' : '';
+    const gKey = item.referencia + '|' + item.bodega + '|' + item._tipo;
+    html += `<div class="item-card ${isDone?'done':''}" onclick="openItemModal('${encodeURIComponent(gKey)}')">
+      <div class="ic-main">
+        <div class="ic-ref">${e(String(item.referencia))} · ${e(String(item.bodega||''))} ${tipoTag}</div>
+        <div class="ic-desc">${e(String(item.desc_item||'—'))}</div>
+        ${kitHtml}
+        <div class="ic-meta">
+          <span class="badge b-pr" style="font-size:13px;padding:3px 10px"><strong>${fmtn(item.cant_total)}</strong> ${e(String(item.um_emp||item.um||''))}</span>
+          ${item._items && item._items.length > 1 ? `<span class="badge b-gray">${item._items.length} docs</span>` : ''}
+          ${item.desc_ciudad ? `<span class="badge b-gray">${e(String(item.desc_ciudad))}</span>` : ''}
+          ${kits.length > 0 ? '<span class="badge b-vio">🎁 OFERTA</span>' : ''}
+          ${prepBadge}
+          ${item.motivo ? `<span class="badge b-wa" style="background:#fef3c7;color:#92400e">⚠️ ${e(String(item.motivo||'').substring(0,20))}</span>` : ''}
+        </div>
+      </div>
+      <div class="ic-bar" style="width:${isDone?100:isParcial?50:0}%;background:${isDone?'var(--ok)':isParcial?'var(--wa)':'var(--gold)'}"></div>
+    </div>`;
+  });
+  rdr(html);
+}
+
+function fabAct() {
+  // Resumen rápido
+  const total = _alItems.length;
+  const compl = _alItems.filter(i => i.estado_prep === 'completo').length;
+  const parc  = _alItems.filter(i => i.estado_prep === 'parcial').length;
+  const pend  = total - compl - parc;
+  const novs  = _alItems.filter(i => i.motivo);
+  let msg = `*RESUMEN ALISTAMIENTO*\n*CO ${G.co.id} — ${G.co.nombre}*\n\n✅ Completos: ${compl}/${total}\n⏳ Parciales: ${parc}\n⬜ Pendientes: ${pend}\n`;
+  if (novs.length) { msg += '\n*NOVEDADES:*\n'; novs.forEach(i => { msg += `• ${i.referencia} (${i.bodega||''}): ${i.motivo}\n`; }); }
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg));
+}
+
+// ── Modal item (alistador) ───────────────────────────────────
+function openItemModal(itemId, tipo) {
+  const item = _alItems.find(i => i.id === itemId && i._tipo === tipo);
+  if (!item) return;
+  const kits = _kitsMap[String(item.referencia)] || [];
+  const qty  = item.cant_comprometida || 1;
+  const isDone = item.estado_prep === 'completo';
+  const isParcial = item.estado_prep === 'parcial';
+
+  let kitSec = '';
+  if (kits.length > 0 && item._desglosar) {
+    kitSec = `<div class="kit-box" style="margin:12px 0">
+      <div style="font-weight:700;color:#6d28d9;margin-bottom:6px">🎁 Esta oferta incluye:</div>`;
+    kits.forEach(k => { kitSec += `<div class="kit-row"><span>${e(k.ref)} — ${e(k.desc||'')}</span><span style="font-weight:700">${fmtn(k.qty * qty)} u.</span></div>`; });
+    kitSec += `<div style="font-size:11px;color:var(--mut);margin-top:4px">Para ${qty} unidades solicitadas</div></div>`;
+  }
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="itmModal" style="display:flex" onclick="if(event.target.id==='itmModal')this.remove()">
+      <div class="modal">
+        <div class="modal-hdl"></div>
+        <div style="font-size:11px;color:var(--mut);font-weight:600">${e(String(item.referencia))} · ${e(String(item.bodega||''))}</div>
+        <div style="font-size:16px;font-weight:700;margin:4px 0 8px">${e(String(item.desc_item||'—'))}</div>
+        ${kitSec}
+        <div style="text-align:center;padding:10px 0">
+          <div style="font-size:12px;color:var(--mut)">Cantidad solicitada</div>
+          <div style="font-size:38px;font-weight:800;color:var(--pr)">${fmtn(item.cant_comprometida)}</div>
+          <div style="font-size:13px;color:var(--mut)">${e(String(item.um_emp||item.um||'UNIDADES'))}</div>
+        </div>
+        ${isDone || isParcial ? `<div style="background:var(--ok-l);padding:10px;border-radius:8px;text-align:center;color:var(--ok);font-weight:700">
+          ${isDone ? '✅ Preparación completa' : '⏳ Preparación parcial: ' + fmtn(item.cant_alistada)}</div>` : ''}
+        ${item.motivo ? `<div style="background:var(--wa-l);padding:8px 10px;border-radius:8px;font-size:12px;margin-top:8px">⚠️ ${e(String(item.motivo))}</div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('itmModal')?.remove()">Cerrar</button>
+          ${!isDone ? `<button class="btn btn-ok" style="flex:1" onclick="confirmarItem('${itemId}','${tipo}','completo')">✅ Completo</button>` : ''}
+        </div>
+        ${!isDone ? `<button class="btn btn-wa" style="margin-top:6px" onclick="openParcialModal('${itemId}','${tipo}')">⏳ Parcial / Novedad</button>` : ''}
+        ${isDone || isParcial ? `<button class="btn btn-sec" style="margin-top:6px" onclick="confirmarItem('${itemId}','${tipo}','pendiente')">↩ Deshacer</button>` : ''}
+      </div>
+    </div>`);
+}
+
+async function confirmarGrupo(gKeyEnc, estado) {
+  document.getElementById('itmModal')?.remove();
+  const gKey = decodeURIComponent(gKeyEnc);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  if (!group) return;
+  ld('Guardando...');
+  try {
+    for (const item of group._items) {
+      const upd = estado === 'completo'
+        ? { estado_prep: 'completo', cant_alistada: item.cant_comprometida, motivo: null }
+        : { estado_prep: 'pendiente', cant_alistada: null, motivo: null };
+      await sb.from(item._tipo).update(upd).eq('id', item.id);
+      Object.assign(item, upd);
+    }
+    // Update group estado
+    group.estado_prep = estado;
+    if (estado === 'completo') { group.cant_alistada_total = group.cant_total; group.motivo = null; }
+    else { group.cant_alistada_total = 0; group.motivo = null; }
+    uld(); toast(estado === 'completo' ? '✅ Completo' : '↩ Deshecho');
+    pgZonaItems(encodeURIComponent(_alZona));
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+function openParcialModal(gKeyEnc) {
+  document.getElementById('itmModal')?.remove();
+  const gKey = decodeURIComponent(gKeyEnc);
+  const item = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  if (!item) return;
+  const gKeyE = gKeyEnc;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="parModal" style="display:flex">
+      <div class="modal">
+        <div class="modal-hdl"></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px">⏳ Preparación parcial / Novedad</div>
+        <div style="font-size:13px;margin-bottom:8px">${e(String(item.referencia))} — ${e(String(item.desc_item||'').substring(0,40))}</div>
+        <span class="inp-label">Cantidad alistada</span>
+        <input id="parQty" class="inp" type="number" min="0" value="${item.cant_alistada || 0}" placeholder="Cantidad preparada"/>
+        <span class="inp-label">Motivo / Novedad</span>
+        <select id="parMotivo" class="inp">
+          <option value="">Sin novedad</option>
+          <option value="Sin stock">Sin stock</option>
+          <option value="Producto dañado">Producto dañado</option>
+          <option value="Cantidad parcial">Cantidad parcial</option>
+          <option value="No ubicado">No ubicado</option>
+          <option value="Fecha vencida">Fecha vencida</option>
+          <option value="Otro">Otro</option>
+        </select>
+        <input id="parNota" class="inp" placeholder="Nota adicional (opcional)" style="margin-top:6px"/>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('parModal').remove()">Cancelar</button>
+          <button class="btn btn-wa" style="flex:1" onclick="saveParcial('${id}','${tipo}')">Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function saveParcial(gKeyEnc) {
+  const qty    = parseFloat(document.getElementById('parQty').value) || 0;
+  const motivo = document.getElementById('parMotivo').value;
+  const nota   = document.getElementById('parNota').value;
+  document.getElementById('parModal')?.remove();
+  const gKey = decodeURIComponent(gKeyEnc);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  if (!group) return;
+  const m = motivo + (nota ? ': ' + nota : '');
+  ld('Guardando...');
+  try {
+    // Distribute qty proportionally across items
+    let remaining = qty;
+    for (let idx = 0; idx < group._items.length; idx++) {
+      const it = group._items[idx];
+      const isLast = idx === group._items.length - 1;
+      const itQty = isLast ? remaining : Math.min(remaining, it.cant_comprometida || 0);
+      const upd = { estado_prep: 'parcial', cant_alistada: itQty, motivo: m || null };
+      await sb.from(it._tipo).update(upd).eq('id', it.id);
+      Object.assign(it, upd);
+      remaining = Math.max(0, remaining - itQty);
+    }
+    group.estado_prep = 'parcial';
+    group.cant_alistada_total = qty;
+    group.motivo = m || null;
+    uld(); toast('⏳ Guardado como parcial');
+    pgZonaItems(encodeURIComponent(_alZona));
+  } catch(e) { uld(); toast('Error: ' + e.message, 'er'); }
+}
+
+
+// ── Selección y eliminación de filas ────────────────────────
+function toggleSelAll(prefix, checked) {
+  document.querySelectorAll('.' + prefix + '-sel').forEach(cb => { cb.checked = checked; });
+}
+
+async function eliminarSeleccionados(prefix, tabla) {
+  const cb = tabla === 'pedidos' ? pgTablaPedidos
+           : tabla === 'requisiciones' ? pgTablaRequisiciones
+           : tabla === 'kits' ? pgTablaKits
+           : tabla === 'bodegas' ? pgTablaBodegas
+           : tabla === 'usuarios' ? pgTablaUsuarios
+           : null;
+  await eliminarSeleccionadosGen(prefix, tabla, cb);
+}
+async function eliminarSeleccionadosGen(prefix, tabla, callback) {
+  const checks = [...document.querySelectorAll('.' + prefix + '-sel:checked')];
+  if (!checks.length) { toast('No hay filas seleccionadas', 'wa'); return; }
+  if (!confirm('¿Eliminar ' + checks.length + ' fila(s) seleccionada(s)?')) return;
+  const ids = checks.map(cb => cb.dataset.id);
+  ld('Eliminando ' + ids.length + ' registros...');
+  let ok = 0, errs = 0;
+  for (const id of ids) {
+    try { await sb.from(tabla).delete().eq('id', id); ok++; }
+    catch { errs++; }
+  }
+  uld();
+  toast(errs ? ok + ' eliminados, ' + errs + ' errores' : '✅ ' + ok + ' registros eliminados', errs ? 'wa' : 'ok');
+  if (callback) callback();
+}
+
+
+// ── Log de importaciones ─────────────────────────────────────
+async function logImportacion(tabla, filasOk, estado, detalle, filasErr, descError) {
+  try {
+    await sb.from('log_importaciones').insert([{
+      tabla,
+      filas_importadas: filasOk || 0,
+      filas_error: filasErr || 0,
+      estado,
+      detalle: detalle || '',
+      desc_error: descError || '',
+      usuario_id: G.user?.id || null,
+      usuario_nombre: G.user?.nombre || 'desconocido',
+      co: G.co?.id || null,
+      fecha_hora: new Date().toISOString(),
+    }]);
+  } catch(e) { console.warn('logImportacion error:', e.message); }
+}
+
+async function pgLogImportaciones() {
+  ld('Cargando historial...');
+  try {
+    const rows = await sb.from('log_importaciones').select('*').order('fecha_hora', false);
+    uld();
+    let data = Array.isArray(rows) ? rows : [];
+    // Admin sees only admin tables, supervisor sees only pedidos/req
+    if (G.perfil === 'admin') {
+      data = data.filter(r => !['pedidos','requisiciones'].includes(r.tabla));
+    } else if (G.perfil === 'supervisor') {
+      data = data.filter(r => ['pedidos','requisiciones'].includes(r.tabla));
+    }
+    // Determine back button based on perfil
+    const logBack = G.perfil === 'supervisor' ? 'pgSupervisor()' : 'pgAdmin()';
+    let html = `<div class="hdr">
+      <button class="hdr-btn" onclick="${logBack}">← Atrás</button>
+      <h1>📋 Log Importaciones</h1>
+      <span class="hdr-sub">${data.length}</span>
+    </div>
+    <div class="filter-bar">
+      <input id="lf1" placeholder="🔍 Tabla" oninput="filtrarLog()"/>
+      <input id="lf2" placeholder="🔍 Usuario" oninput="filtrarLog()"/>
+      <select id="lf3" onchange="filtrarLog()">
+        <option value="">Todos</option>
+        <option value="exito">✅ Éxito</option>
+        <option value="parcial">⚠️ Parcial</option>
+        <option value="error">❌ Error</option>
+      </select>
+    </div>
+    <div class="tbl-wrap" style="margin:8px 14px">
+    <table class="tbl" id="logTbl">
+      <thead><tr><th>Fecha/Hora</th><th>Tabla</th><th>CO</th><th>✅ Ok</th><th>❌ Errores</th><th>Estado</th><th>Usuario</th><th>Descripción error</th></tr></thead>
+      <tbody id="logTbody">`;
+    data.forEach(r => {
+      const cls = r.estado === 'exito' ? 'b-ok' : r.estado === 'error' ? 'b-er' : 'b-wa';
+      const ico = r.estado === 'exito' ? '✅' : r.estado === 'error' ? '❌' : '⚠️';
+      html += '<tr>' +
+        '<td style="white-space:nowrap;font-size:11px">' + e(String(r.fecha_hora||'').replace('T',' ').substring(0,19)) + '</td>' +
+        '<td><span class="badge b-gray">' + e(String(r.tabla||'')) + '</span></td>' +
+        '<td>' + e(String(r.co||'')) + '</td>' +
+        '<td style="text-align:right;color:var(--ok);font-weight:700">' + fmtn(r.filas_importadas) + '</td>' +
+        '<td style="text-align:right;color:' + (r.filas_error > 0 ? 'var(--er)' : 'var(--mut)') + ';font-weight:700">' + fmtn(r.filas_error||0) + '</td>' +
+        '<td><span class="badge ' + cls + '">' + ico + ' ' + e(String(r.estado||'')) + '</span></td>' +
+        '<td>' + e(String(r.usuario_nombre||'')) + '</td>' +
+        '<td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--er)" title="' + e(String(r.desc_error||'')) + '">' + e(String(r.desc_error||r.detalle||'')) + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+    window._logRows = data;
+    rdr(html);
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+function filtrarLog() {
+  const t = document.getElementById('lf1')?.value.toLowerCase() || '';
+  const u = document.getElementById('lf2')?.value.toLowerCase() || '';
+  const s = document.getElementById('lf3')?.value || '';
+  const data = (window._logRows || []).filter(r =>
+    (!t || String(r.tabla||'').toLowerCase().includes(t)) &&
+    (!u || String(r.usuario_nombre||'').toLowerCase().includes(u)) &&
+    (!s || r.estado === s)
+  );
+  const cls = {'exito':'b-ok','error':'b-er','parcial':'b-wa'};
+  const ico = {'exito':'✅','error':'❌','parcial':'⚠️'};
+  const tbody = document.getElementById('logTbody');
+  if (!tbody) return;
+  tbody.innerHTML = data.map(r =>
+    '<tr>' +
+    '<td style="white-space:nowrap;font-size:11px">' + e(String(r.fecha_hora||'').replace('T',' ').substring(0,19)) + '</td>' +
+    '<td><span class="badge b-gray">' + e(String(r.tabla||'')) + '</span></td>' +
+    '<td>' + e(String(r.co||'')) + '</td>' +
+    '<td style="text-align:right;color:var(--ok);font-weight:700">' + fmtn(r.filas_importadas) + '</td>' +
+    '<td style="text-align:right;color:' + (r.filas_error > 0 ? 'var(--er)' : 'var(--mut)') + ';font-weight:700">' + fmtn(r.filas_error||0) + '</td>' +
+    '<td><span class="badge ' + (cls[r.estado]||'b-gray') + '">' + (ico[r.estado]||'') + ' ' + e(String(r.estado||'')) + '</span></td>' +
+    '<td>' + e(String(r.usuario_nombre||'')) + '</td>' +
+    '<td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--er)" title="' + e(String(r.desc_error||'')) + '">' + e(String(r.desc_error||r.detalle||'')) + '</td>' +
+    '</tr>'
+  ).join('');
+}
+
+
+
+function abrirConfirmacionCantidad(gKeyEnc) {
+  document.getElementById('itmModal')?.remove();
+  const gKey = decodeURIComponent(gKeyEnc);
+  const item = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo)===gKey);
+  if (!item) return;
+  const cantTotal = item.cant_total || item.cant_comprometida || 0;
+  const um = e(String(item.um_emp||item.um||'UND'));
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="cantModal" style="display:flex" onclick="if(event.target.id==='cantModal')event.target.remove()">
+      <div class="modal">
+        <div class="modal-hdl"></div>
+        <div style="font-size:13px;color:var(--mut);margin-bottom:4px">${e(item.referencia)} · ${e(item.bodega||'')}</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px">${e(item.desc_item||'—')}</div>
+        <div style="text-align:center;background:var(--gold-l);padding:12px;border-radius:10px;margin-bottom:14px">
+          <div style="font-size:12px;color:var(--mut)">Cantidad solicitada</div>
+          <div style="font-size:40px;font-weight:900;color:var(--pr)">${fmtn(cantTotal)}</div>
+          <div style="font-size:13px;color:var(--mut)">${um}</div>
+        </div>
+        <span class="inp-label">Cantidad alistada (confirmar)</span>
+        <input id="cantConfirm" class="inp" type="number" min="0" max="${cantTotal}"
+          value="${cantTotal}" style="font-size:24px;text-align:center;font-weight:700"
+          oninput="validarCantidadInput(this,${cantTotal})"/>
+        <div id="cantWarning" style="display:none;background:var(--er-l);color:var(--er);padding:8px;border-radius:8px;font-size:12px;margin-top:6px">
+          ⚠️ No puedes confirmar más de ${fmtn(cantTotal)} ${um}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('cantModal').remove()">Cancelar</button>
+          <button class="btn btn-pr" id="cantConfirmBtn" style="flex:1;color:var(--gold)" onclick="procesarConfirmacionCantidad('${gKeyEnc}',${cantTotal})">✅ Confirmar</button>
+        </div>
+      </div>
+    </div>`);
+  const warn = document.getElementById('cantWarning');
+  const btn  = document.getElementById('cantConfirmBtn');
+  if (val > max) {
+    input.style.borderColor = 'var(--er)';
+    if (warn) warn.style.display = 'block';
+    if (btn)  btn.disabled = true;
+  } else {
+    input.style.borderColor = val < max ? 'var(--wa)' : 'var(--ok)';
+    if (warn) warn.style.display = 'none';
+    if (btn)  btn.disabled = false;
+  }
+}
+
+function validarCantidadInput(input, max) {
+  const val = parseFloat(input.value) || 0;
+  const warn = document.getElementById('cantWarning');
+  const btn  = document.getElementById('cantConfirmBtn');
+  if (val > max) {
+    input.style.borderColor = 'var(--er)';
+    if (warn) warn.style.display = 'block';
+    if (btn)  btn.disabled = true;
+  } else {
+    input.style.borderColor = val < max ? 'var(--wa)' : 'var(--ok)';
+    if (warn) warn.style.display = 'none';
+    if (btn)  btn.disabled = false;
+  }
+}
+
+async function procesarConfirmacionCantidad(gKeyEnc, cantMax) {
+  const cantConf = parseFloat(document.getElementById('cantConfirm').value) || 0;
+  if (cantConf > cantMax) { toast('No puedes confirmar más de ' + fmtn(cantMax), 'er'); return; }
+  document.getElementById('cantModal')?.remove();
+  if (cantConf < cantMax) {
+    // Abre modal de parcial con la cantidad ya ingresada
+    const gKey = decodeURIComponent(gKeyEnc);
+    const item = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo)===gKey);
+    if (!item) return;
+    const gKeyE = gKeyEnc;
+    const um2 = e(String(item.um_emp||item.um||''));
+    const parHtml = '<div class="overlay" id="parModal" style="display:flex" onclick="if(event.target.id===\'parModal\')event.target.remove()">'
+      + '<div class="modal"><div class="modal-hdl"></div>'
+      + '<div style="font-weight:700;font-size:15px;margin-bottom:12px">⏳ Cantidad parcial — selecciona motivo</div>'
+      + '<div style="text-align:center;background:var(--wa-l);padding:10px;border-radius:8px;margin-bottom:12px">'
+      + 'Alistado: <strong>' + fmtn(cantConf) + '</strong> de <strong>' + fmtn(cantMax) + '</strong> ' + um2
+      + '</div><span class="inp-label">Motivo (obligatorio)</span>'
+      + '<select id="parMotivo" class="inp"><option value="">Selecciona motivo...</option>'
+      + '<option>Sin stock suficiente</option><option>Producto dañado</option>'
+      + '<option>No ubicado</option><option>Fecha vencida</option>'
+      + '<option>Error en cantidad pedida</option><option>Producto en cuarentena</option>'
+      + '<option>Otro</option></select>'
+      + '<input id="parNota" class="inp" placeholder="Nota adicional (opcional)" style="margin-top:6px"/>'
+      + '<div style="display:flex;gap:8px;margin-top:12px">'
+      + '<button class="btn btn-sec" style="flex:1" onclick="document.getElementById(\'parModal\').remove()">Cancelar</button>'
+      + '<button class="btn btn-wa" style="flex:1" onclick="saveParcialConCantidad(\'' + gKeyEnc + '\',' + cantConf + ')">Guardar</button>'
+      + '</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend', parHtml);
+  } else {
+    await confirmarGrupo(gKeyEnc, 'completo');
+  }
+}
+
+async function saveParcialConCantidad(gKeyEnc, cantConf) {
+  const motivo = document.getElementById('parMotivo').value;
+  if (!motivo) { toast('Selecciona un motivo', 'wa'); return; }
+  const nota = document.getElementById('parNota').value;
+  document.getElementById('parModal')?.remove();
+  // Reutiliza saveParcial setting qty manually
+  const gKey = decodeURIComponent(gKeyEnc);
+  const group = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo)===gKey);
+  if (!group) return;
+  const m = motivo + (nota ? ': '+nota : '');
+  ld('Guardando...');
+  try {
+    let remaining = cantConf;
+    for (let idx = 0; idx < group._items.length; idx++) {
+      const it = group._items[idx];
+      const isLast = idx === group._items.length-1;
+      const itQty = isLast ? remaining : Math.min(remaining, it.cant_comprometida||0);
+      const upd = { estado_prep:'parcial', cant_alistada:itQty, motivo:m };
+      await sb.from(it._tipo).update(upd).eq('id', it.id);
+      Object.assign(it, upd);
+      remaining = Math.max(0, remaining-itQty);
+    }
+    group.estado_prep = 'parcial'; group.cant_alistada_total = cantConf; group.motivo = m;
+    uld(); toast('⏳ Guardado como parcial: '+fmtn(cantConf)+' '+e(String(group.um_emp||group.um||'')));
+    pgZonaItems(encodeURIComponent(_alZona));
+  } catch(err) { uld(); toast('Error: '+err.message,'er'); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 1. DASHBOARD DEL SUPERVISOR
+// ═══════════════════════════════════════════════════════════
+async function pgDashboard() {
+  ld('Cargando dashboard...');
+  try {
+    const [ped, req] = await Promise.all([
+      sb.from('pedidos').select('bodega,zona_logistica,estado_prep,cant_comprometida,cant_alistada').eq('co', G.co.id),
+      sb.from('requisiciones').select('bodega,estado_prep,cant_comprometida,cant_alistada').eq('co', G.co.id),
+    ]);
+    const zonas = await sb.from('zonas').select('referencia,bodega_id,zona,co').eq('co', G.co.id);
+    uld();
+    const todos = [
+      ...(Array.isArray(ped)?ped:[]).map(i=>({...i,_tipo:'pedido'})),
+      ...(Array.isArray(req)?req:[]).map(i=>({...i,_tipo:'req'})),
+    ];
+    const total = todos.length;
+    const compl = todos.filter(i=>i.estado_prep==='completo').length;
+    const parc  = todos.filter(i=>i.estado_prep==='parcial').length;
+    const pend  = todos.filter(i=>!i.estado_prep||i.estado_prep==='pendiente').length;
+    const pct   = total ? Math.round((compl+parc)/total*100) : 0;
+
+    // Group by zona
+    const zonaMap = {};
+    (Array.isArray(zonas)?zonas:[]).forEach(z => {
+      zonaMap[z.referencia+'|'+z.bodega_id] = z.zona || 'SIN ZONA';
+    });
+    const byZona = {};
+    todos.forEach(it => {
+      const z = zonaMap[it.referencia+'|'+it.bodega] || 'SIN ZONA';
+      if (!byZona[z]) byZona[z] = {total:0,compl:0,parc:0};
+      byZona[z].total++;
+      if (it.estado_prep==='completo') byZona[z].compl++;
+      else if (it.estado_prep==='parcial') byZona[z].parc++;
+    });
+
+    let zonaBars = Object.entries(byZona).sort((a,b)=>b[1].total-a[1].total).map(([zona,info])=>{
+      const zp = info.total ? Math.round((info.compl+info.parc)/info.total*100) : 0;
+      const col = zp===100?'var(--ok)':zp>50?'var(--gold)':'var(--er)';
+      return '<div class="zona-bar">'
+        + '<div class="zona-bar-name">' + e(zona) + '</div>'
+        + '<div class="zona-bar-bg"><div class="zona-bar-fill" style="width:' + zp + '%;background:' + col + '"></div></div>'
+        + '<div class="zona-bar-pct">' + zp + '%</div>'
+        + '<div style="font-size:10px;color:var(--mut)">' + (info.compl+info.parc) + '/' + info.total + '</div>'
+        + '</div>';
+    }).join('');
+
+    // Cant total vs alistada
+    const cantTotal  = todos.reduce((s,i)=>s+(parseFloat(i.cant_comprometida)||0),0);
+    const cantAlist  = todos.reduce((s,i)=>s+(parseFloat(i.cant_alistada)||0),0);
+
+    const zonasBarsHtml = zonaBars || '<div style="color:var(--mut);font-size:13px">Sin datos de zonas</div>';
+    rdr('<div class="hdr">'
+      + '<button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>'
+      + '<h1>📊 Dashboard</h1><span class="hdr-sub">CO ' + G.co.id + '</span></div>'
+      + '<div style="padding:10px 14px 4px">'
+      + '<div class="prog-bg" style="height:14px"><div class="prog-fill" style="width:' + pct + '%"></div></div>'
+      + '<div style="text-align:center;font-size:13px;font-weight:700;margin-top:4px;color:var(--gold)">' + pct + '% completado</div></div>'
+      + '<div class="dash-grid">'
+      + '<div class="dash-card" style="border-left:4px solid var(--ok)"><div class="dash-title">✅ Completos</div>'
+      + '<div class="dash-big" style="color:var(--ok)">' + compl + '</div>'
+      + '<div class="dash-sub">' + (total ? Math.round(compl/total*100) : 0) + '% del total</div></div>'
+      + '<div class="dash-card" style="border-left:4px solid var(--wa)"><div class="dash-title">⏳ Parciales</div>'
+      + '<div class="dash-big" style="color:var(--wa)">' + parc + '</div>'
+      + '<div class="dash-sub">' + (total ? Math.round(parc/total*100) : 0) + '% del total</div></div>'
+      + '<div class="dash-card" style="border-left:4px solid var(--mut)"><div class="dash-title">⬜ Pendientes</div>'
+      + '<div class="dash-big" style="color:var(--mut)">' + pend + '</div>'
+      + '<div class="dash-sub">' + (total ? Math.round(pend/total*100) : 0) + '% del total</div></div>'
+      + '<div class="dash-card" style="border-left:4px solid var(--gold)"><div class="dash-title">📦 Cantidades</div>'
+      + '<div class="dash-big">' + fmtn(Math.round(cantAlist)) + '</div>'
+      + '<div class="dash-sub">de ' + fmtn(Math.round(cantTotal)) + ' totales</div></div></div>'
+      + '<div class="dash-card-full"><div class="dash-title">📍 Avance por zona</div>' + zonasBarsHtml + '</div>'
+      + '<div style="padding:0 14px 12px"><button class="btn btn-pr" style="color:var(--gold)" onclick="pgDashboard()">🔄 Actualizar</button></div>'
+    );
+  } catch(err) { uld(); toast('Error: '+err.message,'er'); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 2. SUPERVISIÓN EN VIVO
+// ═══════════════════════════════════════════════════════════
+async function pgSupervisionVivo() {
+  ld('Cargando...');
+  try {
+    const sesiones = await sb.from('sesiones_activas').select('*');
+    uld();
+    const data = Array.isArray(sesiones) ? sesiones : [];
+    let rows = data.length === 0
+      ? '<div style="text-align:center;color:var(--mut);padding:24px">No hay alistadores activos en este momento</div>'
+      : data.map(s =>
+          '<div class="live-row">'
+          + '<div class="live-dot"></div>'
+          + '<div style="flex:1">'
+          + '<div class="live-name">' + e(s.usuario_nombre||'—') + '</div>'
+          + '<div class="live-zona">📍 ' + e(s.zona_actual||'Sin zona') + ' · CO ' + e(s.co||'') + '</div>'
+          + '</div>'
+          + '<div style="text-align:right">'
+          + '<div style="font-size:11px;color:var(--mut)">' + e(String(s.actualizado_en||'').replace('T',' ').substring(0,16)) + '</div>'
+          + '<div class="timer-box" style="margin-top:4px">' + calcTiempoDesde(s.inicio_sesion) + '</div>'
+          + '</div></div>'
+        ).join('');
+
+    rdr(`<div class="hdr">
+      <button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>
+      <h1>👁️ En vivo</h1>
+      <span class="hdr-sub">${data.length} activos</span>
+    </div>
+    <div class="card">${rows}</div>
+    <div style="padding:0 14px">
+      <button class="btn btn-pr" style="color:var(--gold)" onclick="pgSupervisionVivo()">🔄 Actualizar</button>
+    </div>`);
+  } catch(err) {
+    uld();
+    // Tabla puede no existir aún — mostrar pantalla vacía con instrucción
+    rdr(`<div class="hdr">
+      <button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>
+      <h1>👁️ En vivo</h1>
+    </div>
+    <div class="card" style="text-align:center;color:var(--mut)">
+      <div style="font-size:32px;margin-bottom:8px">🔧</div>
+      <div style="font-weight:700">Requiere SQL adicional</div>
+      <div style="font-size:12px;margin-top:6px">Ejecuta el SQL de sesiones_activas en Supabase para activar esta función.</div>
+    </div>`);
+  }
+}
+
+function calcTiempoDesde(iso) {
+  if (!iso) return '—';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 60) return mins + ' min';
+  return Math.floor(mins/60) + 'h ' + (mins%60) + 'm';
+}
+
+// ═══════════════════════════════════════════════════════════
+// 3. HISTORIAL DE ALISTAMIENTOS
+// ═══════════════════════════════════════════════════════════
+async function pgHistorialAlistamientos() {
+  ld('Cargando historial...');
+  try {
+    const data = await sb.from('historial_alistamientos').select('*').order('fecha_cierre', false);
+    uld();
+    const rows = Array.isArray(data) ? data : [];
+    let html = `<div class="hdr">
+      <button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>
+      <h1>📈 Historial</h1><span class="hdr-sub">${rows.length}</span>
+    </div>`;
+    if (rows.length === 0) {
+      html += '<div class="card" style="text-align:center;color:var(--mut)">Sin alistamientos registrados aún</div>';
+    }
+    rows.forEach(r => {
+      const pct = r.total_refs > 0 ? Math.round(r.refs_completas/r.total_refs*100) : 0;
+      html += `<div class="hist-item">
+        <div class="hist-date">${e(String(r.fecha_cierre||r.fecha_inicio||'').replace('T',' ').substring(0,16))}</div>
+        <div class="hist-title">CO ${e(r.co||'')} — ${e(r.zona||'Todas las zonas')}</div>
+        <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+          <div class="prog-bg" style="flex:1;height:6px"><div class="prog-fill" style="width:${pct}%"></div></div>
+          <span class="badge b-ok">${r.refs_completas}/${r.total_refs}</span>
+          ${r.duracion_minutos ? `<span class="badge b-gray">⏱ ${r.duracion_minutos} min</span>` : ''}
+          ${r.usuario_nombre ? `<span class="badge b-gray">👤 ${e(r.usuario_nombre)}</span>` : ''}
+        </div>
+        ${r.validado_supervisor ? '<div class="valid-badge valid-ok" style="margin-top:6px">✅ Validado por supervisor</div>' : '<div class="valid-badge valid-pend" style="margin-top:6px">⏳ Pendiente validación</div>'}
+      </div>`;
+    });
+    rdr(html);
+  } catch(err) {
+    uld();
+    rdr(`<div class="hdr">
+      <button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>
+      <h1>📈 Historial</h1>
+    </div>
+    <div class="card" style="text-align:center;color:var(--mut)">
+      <div style="font-size:32px;margin-bottom:8px">🔧</div>
+      <div style="font-weight:700">Requiere SQL adicional</div>
+      <div style="font-size:12px;margin-top:6px">Ejecuta el SQL de historial_alistamientos en Supabase.</div>
+    </div>`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 4. TIMER POR ZONA — registra inicio/fin y guarda en historial
+// ═══════════════════════════════════════════════════════════
+let _zonaTimer = null;    // { zona, inicio: Date, intervalo }
+
+function iniciarTimerZona(zona) {
+  if (_zonaTimer) detenerTimerZona();
+  _zonaTimer = { zona, inicio: new Date(), intervalo: null };
+  _zonaTimer.intervalo = setInterval(() => {
+    const el = document.getElementById('zonaTimerDisplay');
+    if (el) el.textContent = '⏱ ' + calcTiempoDesde(_zonaTimer.inicio.toISOString());
+  }, 10000); // update every 10s
+  // Register en sesiones_activas
+  registrarSesionActiva(zona);
+}
+
+async function detenerTimerZona() {
+  if (!_zonaTimer) return;
+  clearInterval(_zonaTimer.intervalo);
+  const mins = Math.round((Date.now() - _zonaTimer.inicio.getTime()) / 60000);
+  const zona = _zonaTimer.zona;
+  _zonaTimer = null;
+  // Guardar en historial
+  try {
+    const items = _alItems.filter(i => (i._zona||'SIN ZONA') === zona);
+    const compl = items.filter(i=>i.estado_prep==='completo').length;
+    await sb.from('historial_alistamientos').insert([{
+      co: G.co.id,
+      zona,
+      usuario_id: G.user.id,
+      usuario_nombre: G.user.nombre,
+      fecha_inicio: _zonaTimer?.inicio || new Date().toISOString(),
+      fecha_cierre: new Date().toISOString(),
+      duracion_minutos: mins,
+      total_refs: items.length,
+      refs_completas: compl,
+      validado_supervisor: false,
+    }]);
+  } catch(e) { console.warn('historial save:', e.message); }
+  // Limpiar sesión activa
+  try {
+    await sb.from('sesiones_activas').delete().eq('usuario_id', G.user.id);
+  } catch(e) {}
+}
+
+async function registrarSesionActiva(zona) {
+  try {
+    await sb.from('sesiones_activas').upsert([{
+      usuario_id: G.user.id,
+      usuario_nombre: G.user.nombre,
+      co: G.co.id,
+      zona_actual: zona,
+      inicio_sesion: new Date().toISOString(),
+      actualizado_en: new Date().toISOString(),
+    }], 'usuario_id');
+  } catch(e) { console.warn('sesion activa:', e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 5. BÚSQUEDA RÁPIDA DE REFERENCIA (alistador)
+// ═══════════════════════════════════════════════════════════
+function abrirBuscador() {
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="search-overlay" id="buscadorOverlay" style="display:flex">
+      <div class="search-box">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="buscadorInput" class="inp" style="flex:1;margin:0;font-size:16px"
+            placeholder="🔍 Referencia o descripción..."
+            oninput="buscarReferencia(this.value)" autofocus/>
+          <button class="btn btn-sec btn-sm" onclick="cerrarBuscador()" style="margin:0">✕</button>
+        </div>
+      </div>
+      <div class="search-results" id="buscadorResults">
+        <div style="text-align:center;padding:24px;color:var(--mut)">Escribe para buscar...</div>
+      </div>
+    </div>`);
+  setTimeout(()=>document.getElementById('buscadorInput')?.focus(), 100);
+}
+
+function cerrarBuscador() {
+  document.getElementById('buscadorOverlay')?.remove();
+}
+
+function buscarReferencia(q) {
+  const el = document.getElementById('buscadorResults');
+  if (!el) return;
+  const query = q.trim().toLowerCase();
+  if (query.length < 2) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--mut)">Escribe al menos 2 caracteres</div>'; return; }
+  const found = _alItems.filter(i =>
+    String(i.referencia||'').toLowerCase().includes(query) ||
+    String(i.desc_item||'').toLowerCase().includes(query)
+  ).slice(0, 20);
+  if (!found.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--mut)">Sin resultados</div>'; return; }
+  el.innerHTML = found.map(item => {
+    const prep = item.estado_prep || 'pendiente';
+    const cls = prep==='completo'?'b-ok':prep==='parcial'?'b-wa':'b-gray';
+    const gKey = encodeURIComponent(item.referencia+'|'+item.bodega+'|'+item._tipo);
+    return `<div class="search-row" onclick="irAItem('${gKey}','${encodeURIComponent(item._zona||'SIN ZONA')}')">
+      <div style="font-size:11px;color:var(--mut)">${e(item.referencia)} · ${e(item.bodega||'')}</div>
+      <div style="font-weight:700;font-size:13px">${e(item.desc_item||'—')}</div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <span class="badge b-pr">${fmtn(item.cant_total)}</span>
+        <span class="badge b-gray">${e(item._zona||'SIN ZONA')}</span>
+        <span class="badge ${cls}">${prep}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function irAItem(gKeyEnc, zonaEnc) {
+  cerrarBuscador();
+  _alZona = decodeURIComponent(zonaEnc);
+  pgZonaItems(zonaEnc);
+  setTimeout(() => openItemModal(gKeyEnc), 300);
+}
+
+// ═══════════════════════════════════════════════════════════
+// 6. ESCÁNER DE CÓDIGO DE BARRAS
+// ═══════════════════════════════════════════════════════════
+let _scanStream = null;
+
+async function abrirEscaner() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    toast('Tu dispositivo no soporta cámara', 'er'); return;
+  }
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="search-overlay" id="scanOverlay" style="display:flex;flex-direction:column;background:#000">
+      <div style="padding:14px;display:flex;align-items:center;gap:10px">
+        <div style="color:#fff;font-weight:700;flex:1">📷 Escanear código de barras</div>
+        <button class="btn btn-sec btn-sm" onclick="cerrarEscaner()">✕ Cerrar</button>
+      </div>
+      <video id="scanVideo" style="width:100%;max-height:60vh;object-fit:cover" playsinline autoplay></video>
+      <div style="padding:14px">
+        <div style="color:var(--gold);font-size:13px;text-align:center;margin-bottom:8px">O ingresa el código manualmente:</div>
+        <div style="display:flex;gap:8px">
+          <input id="scanManual" class="inp" style="flex:1" placeholder="Código de barras / referencia"
+            onkeydown="if(event.key==='Enter')procesarCodigoBarras(this.value)"/>
+          <button class="btn btn-pr btn-sm" style="color:var(--gold)" onclick="procesarCodigoBarras(document.getElementById('scanManual').value)">Buscar</button>
+        </div>
+      </div>
+    </div>`);
+  // Intentar activar cámara
+  try {
+    _scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const video = document.getElementById('scanVideo');
+    if (video) { video.srcObject = _scanStream; video.play(); }
+    // Usar BarcodeDetector si disponible
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['code_128','ean_13','ean_8','code_39','upc_a'] });
+      const scan = async () => {
+        if (!document.getElementById('scanVideo')) return;
+        try {
+          const codes = await detector.detect(document.getElementById('scanVideo'));
+          if (codes.length > 0) { procesarCodigoBarras(codes[0].rawValue); return; }
+        } catch {}
+        if (document.getElementById('scanOverlay')) requestAnimationFrame(scan);
+      };
+      requestAnimationFrame(scan);
+    }
+  } catch(e) { console.warn('camera:', e.message); }
+}
+
+function cerrarEscaner() {
+  if (_scanStream) { _scanStream.getTracks().forEach(t=>t.stop()); _scanStream = null; }
+  document.getElementById('scanOverlay')?.remove();
+}
+
+function procesarCodigoBarras(codigo) {
+  cerrarEscaner();
+  if (!codigo) return;
+  const q = codigo.trim();
+  // Buscar por codigo_barra o referencia
+  const found = _alItems.filter(i =>
+    String(i.referencia||'').toLowerCase() === q.toLowerCase() ||
+    (i._items||[]).some(it => String(it.codigo_barra||'') === q)
+  );
+  if (!found.length) {
+    toast('Código no encontrado: ' + q, 'wa'); return;
+  }
+  if (found.length === 1) {
+    const gKey = encodeURIComponent(found[0].referencia+'|'+found[0].bodega+'|'+found[0]._tipo);
+    _alZona = found[0]._zona || 'SIN ZONA';
+    openItemModal(gKey);
+  } else {
+    // Múltiples coincidencias — mostrar buscador con resultados
+    abrirBuscador();
+    setTimeout(() => {
+      const inp = document.getElementById('buscadorInput');
+      if (inp) { inp.value = q; buscarReferencia(q); }
+    }, 200);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 7. CONFIRMACIÓN DE CANTIDAD (nueva versión de confirmarGrupo)
+// ═══════════════════════════════════════════════════════════
+// Se reemplaza dentro de openItemModal en la próxima sección
+
+// ═══════════════════════════════════════════════════════════
+// 8. IMPRESIÓN DE LISTA DE PICKING POR ZONA
+// ═══════════════════════════════════════════════════════════
+function imprimirZona(zona) {
+  const items = _alItems.filter(i=>(i._zona||'SIN ZONA')===zona)
+    .sort((a,b)=>(a._seq||9999)-(b._seq||9999));
+  const fecha = new Date().toLocaleDateString('es-CO');
+  const hora  = new Date().toLocaleTimeString('es-CO');
+  let rows = items.map((item,idx)=>`
+    <tr>
+      <td>${idx+1}</td>
+      <td><strong>${item.referencia}</strong></td>
+      <td>${item.desc_item||''}</td>
+      <td>${item.bodega||''}</td>
+      <td style="text-align:center"><strong>${fmtn(item.cant_total)}</strong></td>
+      <td style="text-align:center">${item.um_emp||item.um||''}</td>
+      <td style="width:80px;border-bottom:1px solid #999"></td>
+    </tr>`).join('');
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+    <title>Picking ${zona} — CO ${G.co.id}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:11px;margin:16px}
+      h2{font-size:14px;margin-bottom:4px}
+      .meta{font-size:10px;color:#666;margin-bottom:12px}
+      table{width:100%;border-collapse:collapse}
+      th{background:#1a1a1a;color:#c9a84c;padding:5px;text-align:left;font-size:10px}
+      td{padding:4px 5px;border-bottom:1px solid #eee}
+      tr:nth-child(even) td{background:#f9f9f9}
+      .footer{margin-top:20px;font-size:10px;color:#666;display:flex;justify-content:space-between}
+      @media print{body{margin:0}.no-print{display:none}}
+    </style></head><body>
+    <div class="no-print" style="margin-bottom:12px">
+      <button onclick="window.print()" style="padding:8px 16px;background:#1a1a1a;color:#c9a84c;border:none;border-radius:6px;cursor:pointer;font-weight:700">🖨️ Imprimir</button>
+      <button onclick="window.close()" style="padding:8px 16px;margin-left:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer">✕ Cerrar</button>
+    </div>
+    <h2>Lista de Picking — Zona ${zona}</h2>
+    <div class="meta">CO ${G.co.id} — ${G.co.nombre} &nbsp;|&nbsp; Generado: ${fecha} ${hora} &nbsp;|&nbsp; Alistador: ${G.user.nombre}</div>
+    <table>
+      <thead><tr><th>#</th><th>Referencia</th><th>Descripción</th><th>Bodega</th><th>Cantidad</th><th>UM</th><th>Confirmado ✓</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">
+      <span>Total referencias: ${items.length}</span>
+      <span>Firma alistador: ___________________</span>
+    </div>
+    </body></html>`);
+  win.document.close();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 9. VALIDACIÓN DEL SUPERVISOR
+// ═══════════════════════════════════════════════════════════
+async function validarZona(zona, accion) {
+  // accion: 'validar' | 'reiniciar'
+  ld(accion==='validar' ? 'Validando...' : 'Reiniciando...');
+  try {
+    if (accion === 'validar') {
+      // Marcar todos los ítems de la zona como validados
+      const items = _alItems.filter(i=>(i._zona||'SIN ZONA')===zona);
+      for (const group of items) {
+        for (const it of group._items||[group]) {
+          if (it.estado_prep !== 'completo') continue;
+          await sb.from(it._tipo||'pedidos').update({ validado_supervisor: true }).eq('id', it.id);
+        }
+      }
+      // Guardar en historial
+      await sb.from('historial_alistamientos').insert([{
+        co: G.co.id, zona,
+        usuario_nombre: G.user.nombre,
+        fecha_cierre: new Date().toISOString(),
+        total_refs: items.length,
+        refs_completas: items.filter(i=>i.estado_prep==='completo').length,
+        validado_supervisor: true,
+        validado_por: G.user.nombre,
+      }]);
+      uld(); toast('✅ Zona validada correctamente');
+    } else {
+      // Reiniciar todos los ítems de la zona
+      const items = _alItems.filter(i=>(i._zona||'SIN ZONA')===zona);
+      for (const group of items) {
+        for (const it of group._items||[group]) {
+          await sb.from(it._tipo||'pedidos').update({ estado_prep:'pendiente', cant_alistada:null, motivo:null }).eq('id', it.id);
+          it.estado_prep = 'pendiente'; it.cant_alistada = null; it.motivo = null;
+        }
+        group.estado_prep = 'pendiente'; group.cant_alistada_total = 0;
+      }
+      uld(); toast('↩ Zona reiniciada — todos los ítems vuelven a pendiente', 'wa');
+    }
+    // Recargar datos
+    await pgAlistador();
+  } catch(err) { uld(); toast('Error: '+err.message,'er'); }
+}
+
+function abrirValidacionSupervisor(zonaEnc) {
+  const zona = decodeURIComponent(zonaEnc);
+  const items = _alItems.filter(i=>(i._zona||'SIN ZONA')===zona);
+  const compl = items.filter(i=>i.estado_prep==='completo').length;
+  const parc  = items.filter(i=>i.estado_prep==='parcial').length;
+  const pend  = items.filter(i=>!i.estado_prep||i.estado_prep==='pendiente').length;
+  const pct   = items.length ? Math.round((compl+parc)/items.length*100) : 0;
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="validModal" style="display:flex" onclick="if(event.target.id==='validModal')event.target.remove()">
+      <div class="modal">
+        <div class="modal-hdl"></div>
+        <div style="font-weight:700;font-size:16px;margin-bottom:4px">🔍 Validar zona ${e(zona)}</div>
+        <div style="font-size:12px;color:var(--mut);margin-bottom:14px">CO ${G.co.id} — ${G.co.nombre}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+          <div class="stat-box"><div class="stat-n" style="color:var(--ok)">${compl}</div><div class="stat-l">Completos</div></div>
+          <div class="stat-box"><div class="stat-n" style="color:var(--wa)">${parc}</div><div class="stat-l">Parciales</div></div>
+          <div class="stat-box"><div class="stat-n" style="color:var(--mut)">${pend}</div><div class="stat-l">Pendientes</div></div>
+        </div>
+        <div class="prog-bg" style="height:10px;margin-bottom:12px"><div class="prog-fill" style="width:${pct}%"></div></div>
+        ${pend > 0 ? '<div style="background:var(--wa-l);padding:8px;border-radius:8px;font-size:12px;margin-bottom:10px">⚠️ Hay '+pend+' ítems pendientes. ¿Deseas validar de todas formas?</div>' : '<div style="background:var(--ok-l);padding:8px;border-radius:8px;font-size:12px;margin-bottom:10px">✅ Zona al '+pct+'% — lista para validar</div>'}
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sec" style="flex:1" onclick="document.getElementById('validModal').remove()">Cancelar</button>
+          <button class="btn btn-pr" style="flex:1;color:var(--gold)" onclick="document.getElementById('validModal').remove();validarZona('${e(zona)}','validar')">✅ Validar</button>
+        </div>
+        <button class="btn btn-er" style="margin-top:8px" onclick="document.getElementById('validModal').remove();validarZona('${e(zona)}','reiniciar')">↩ Reiniciar zona</button>
+      </div>
+    </div>`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORTAR A EXCEL
+// ═══════════════════════════════════════════════════════════
+const EXPORT_CFGS = {
+  zonas:         { nombre:'Zonas',          cols:['id','referencia','descripcion','bodega_id','zona','secuencia','desglosar_oferta','co'], headers:['ID','REFERENCIA','DESCRIPCION','BODEGA_ID','ZONA','SECUENCIA','DESGLOSAR_OFERTA','C.O.'] },
+  kits:          { nombre:'Kits',           cols:['id','referencia','desc_item','referencia_comp','desc_item_comp','cantidad_requerida'], headers:['ID','REFERENCIA','DESC_ITEM','REFERENCIA_COMP','DESC_ITEM_COMP','CANTIDAD_REQUERIDA'] },
+  usuarios:      { nombre:'Usuarios',       cols:['id','usuario_id','nombre','centros_operacion','perfiles','activo'], headers:['ID','USUARIO_ID','NOMBRE','CENTROS_OPERACION','PERFILES','ACTIVO'] },
+  bodegas:       { nombre:'Bodegas',        cols:['id','codigo','descripcion','co','desc_co','estado','desc_departamento','desc_ciudad','direccion'], headers:['ID','CODIGO','DESCRIPCION','CO','DESC_CO','ESTADO','DESC_DEPARTAMENTO','DESC_CIUDAD','DIRECCION'] },
+  pedidos:       { nombre:'Pedidos',        cols:['id','nro_documento','referencia','desc_item','bodega','desc_ciudad','cant_comprometida','um_emp','estado_movto','estado_prep','cant_alistada','motivo','co','fecha','fecha_entrega'], headers:['ID','NRO_DOCUMENTO','REFERENCIA','DESC_ITEM','BODEGA','DESC_CIUDAD','CANT_COMPROMETIDA','UM_EMP','ESTADO_MOVTO','ESTADO_PREP','CANT_ALISTADA','MOTIVO','CO','FECHA','FECHA_ENTREGA'] },
+  requisiciones: { nombre:'Requisiciones',  cols:['id','nro_documento','referencia','desc_item','bodega','bodega_entrada','bodega_salida','cant_comprometida','um','estado_movto','estado_prep','cant_alistada','motivo','co','fecha_docto','fecha_entrega'], headers:['ID','NRO_DOCUMENTO','REFERENCIA','DESC_ITEM','BODEGA','BOD_ENTRADA','BOD_SALIDA','CANT_COMPROMETIDA','UM','ESTADO_MOVTO','ESTADO_PREP','CANT_ALISTADA','MOTIVO','CO','FECHA_DOCTO','FECHA_ENTREGA'] },
+};
+
+function buildSheet(data, cfg) {
+  const rows = [cfg.headers];
+  (data || []).forEach(r => {
+    rows.push(cfg.cols.map(c => {
+      const v = r[c];
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+      return v;
+    }));
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = cfg.headers.map((h, i) => {
+    const maxL = Math.max(h.length, ...(data||[]).slice(0,50).map(r => String(r[cfg.cols[i]]||'').length));
+    return { wch: Math.min(maxL + 2, 45) };
+  });
+  return ws;
+}
+
+async function exportTableFiltrado(tabla, todosRows, filtros) {
+  // Ask user: filtered or all?
+  const hayFiltro = filtros && Object.values(filtros).some(v => v && v !== 'todos');
+  let usarFiltro = false;
+  if (hayFiltro) {
+    usarFiltro = confirm('¿Exportar solo los registros filtrados?\nAcepta = Solo filtrados    Cancela = Todos los registros');
+  }
+  const cfg  = EXPORT_CFGS[tabla];
+  let data;
+  if (usarFiltro && todosRows) {
+    // Apply same filters client-side
+    data = todosRows;
+    if (tabla === 'pedidos' && filtros) {
+      if (filtros.doc)  data = data.filter(r => String(r.nro_documento||'').toLowerCase().includes(filtros.doc.toLowerCase()));
+      if (filtros.ref)  data = data.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+      if (filtros.bod)  data = data.filter(r => r.bodega === filtros.bod);
+      if (filtros.est)  data = data.filter(r => r.estado_movto === filtros.est);
+      if (filtros.prep && filtros.prep !== 'todos') data = data.filter(r => r.estado_prep === filtros.prep);
+    } else if (tabla === 'requisiciones' && filtros) {
+      if (filtros.doc)  data = data.filter(r => String(r.nro_documento||'').toLowerCase().includes(filtros.doc.toLowerCase()));
+      if (filtros.ref)  data = data.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+      if (filtros.bod)  data = data.filter(r => r.bodega === filtros.bod);
+      if (filtros.prep && filtros.prep !== 'todos') data = data.filter(r => r.estado_prep === filtros.prep);
+    } else if (tabla === 'kits' && filtros) {
+      if (filtros.ref)  data = data.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+      if (filtros.desc) data = data.filter(r => String(r.desc_item||'').toLowerCase().includes(filtros.desc.toLowerCase()));
+      if (filtros.comp) data = data.filter(r => String(r.referencia_comp||'').toLowerCase().includes(filtros.comp.toLowerCase()));
+    } else if (tabla === 'zonas' && filtros) {
+      if (filtros.ref)  data = data.filter(r => String(r.referencia||'').toLowerCase().includes(filtros.ref.toLowerCase()));
+      if (filtros.desc) data = data.filter(r => String(r.descripcion||'').toLowerCase().includes(filtros.desc.toLowerCase()));
+      if (filtros.zona) data = data.filter(r => r.zona === filtros.zona);
+      if (filtros.bod)  data = data.filter(r => String(r.bodega_id) === filtros.bod);
+    } else if (tabla === 'bodegas' && filtros) {
+      if (filtros.cod)  data = data.filter(r => String(r.codigo||'').toLowerCase().includes(filtros.cod.toLowerCase()));
+      if (filtros.desc) data = data.filter(r => String(r.descripcion||'').toLowerCase().includes(filtros.desc.toLowerCase()));
+      if (filtros.ciu)  data = data.filter(r => String(r.desc_ciudad||'').toLowerCase().includes(filtros.ciu.toLowerCase()));
+      if (filtros.co)   data = data.filter(r => String(r.co||'').includes(filtros.co));
+    } else if (tabla === 'usuarios' && filtros) {
+      if (filtros.nom)  data = data.filter(r => String(r.nombre||'').toLowerCase().includes(filtros.nom.toLowerCase()));
+      if (filtros.co)   data = data.filter(r => String(r.centros_operacion||'').includes(filtros.co));
+      if (filtros.per)  data = data.filter(r => String(r.perfiles||'').toLowerCase().includes(filtros.per.toLowerCase()));
+    }
+  } else {
+    ld('Descargando ' + tabla + '...');
+    try { data = await sb.from(tabla).select('*'); } catch(err) { uld(); toast('Error: ' + err.message, 'er'); return; }
+    uld();
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, buildSheet(Array.isArray(data) ? data : [], cfg), cfg.nombre.substring(0,31));
+  const sufijo = usarFiltro ? '_filtrado' : '_completo';
+  XLSX.writeFile(wb, cfg.nombre + sufijo + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  toast('✅ ' + (Array.isArray(data) ? data.length : 0) + ' filas exportadas' + (usarFiltro ? ' (filtrado)' : ''));
+}
+
+async function exportTable(tabla) {
+  ld('Exportando ' + tabla + '...');
+  try {
+    const data = await sb.from(tabla).select('*');
+    const cfg  = EXPORT_CFGS[tabla];
+    const wb   = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, buildSheet(Array.isArray(data) ? data : [], cfg), cfg.nombre.substring(0,31));
+    XLSX.writeFile(wb, cfg.nombre + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    uld(); toast('✅ ' + (Array.isArray(data) ? data.length : 0) + ' filas exportadas');
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+async function exportAll() {
+  ld('Exportando todas las tablas...');
+  try {
+    const tablas = ['zonas','kits','usuarios','bodegas','pedidos','requisiciones'];
+    const wb = XLSX.utils.book_new();
+    let total = 0;
+    for (const t of tablas) {
+      const data = await sb.from(t).select('*');
+      const cfg  = EXPORT_CFGS[t];
+      XLSX.utils.book_append_sheet(wb, buildSheet(Array.isArray(data) ? data : [], cfg), cfg.nombre.substring(0,31));
+      total += Array.isArray(data) ? data.length : 0;
+    }
+    XLSX.writeFile(wb, 'Alistamiento_Backup_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    uld(); toast('✅ ' + total + ' registros en 6 hojas');
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+// ── Arrancar ─────────────────────────────────────────────────
+pgLogin();
+</script>
+</body>
+</html>
