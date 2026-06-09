@@ -1702,14 +1702,31 @@ async function pgAlistador() {
     });
     // Load zonas para el CO
     const zonas = await sb.from('zonas').select('*').eq('co', G.co.id);
+    // zonaMap: clave = referencia|bodega — tanto zonas.bodega_id como pedidos.bodega deben coincidir
     const zonaMap = {};
-    (Array.isArray(zonas) ? zonas : []).forEach(z => { zonaMap[String(z.referencia) + '|' + String(z.bodega_id)] = z; });
+    (Array.isArray(zonas) ? zonas : []).forEach(z => {
+      // Guardar por referencia+bodega (sin CO — ya filtrado por CO arriba)
+      const key = String(z.referencia).trim() + '|' + String(z.bodega_id).trim();
+      zonaMap[key] = z;
+    });
 
-    // Enrich items with zona info and consolidate by referencia+bodega+tipo
+    // Debug: log a few keys to verify
+    console.log('zonaMap keys (first 5):', Object.keys(zonaMap).slice(0,5));
+    console.log('Pedidos bodega sample:', (Array.isArray(ped)?ped:[]).slice(0,3).map(p=>p.referencia+'|'+p.bodega));
+
+    // Enrich items with zona info
     const enrichOne = (it, tipo) => {
-      const key = String(it.referencia) + '|' + String(it.bodega);
+      // Usar el campo bodega del item (ya filtrado por CO al hacer la query)
+      const key = String(it.referencia).trim() + '|' + String(it.bodega).trim();
       const z = zonaMap[key] || {};
-      return { ...it, _tipo: tipo, _zona: z.zona || 'SIN ZONA', _seq: z.secuencia || 9999, _desglosar: z.desglosar_oferta || false };
+      return {
+        ...it,
+        _tipo: tipo,
+        _zona: z.zona || 'SIN ZONA',
+        _seq: z.secuencia != null ? z.secuencia : 9999,
+        _desglosar: z.desglosar_oferta || false,
+        zona_logistica: it.zona_logistica || '',
+      };
     };
     const allRaw = [
       ...(Array.isArray(ped) ? ped : []).map(i => enrichOne(i, 'pedidos')),
@@ -1720,7 +1737,8 @@ async function pgAlistador() {
     // Each group has _items[] (originals) and cant_total (sum)
     const groupMap = {};
     allRaw.forEach(it => {
-      const gk = it.referencia + '|' + it.bodega + '|' + it._tipo;
+      // Incluir CO en la clave para evitar mezcla entre centros de operación
+      const gk = it.referencia + '|' + it.bodega + '|' + it._tipo + '|' + (it.co || G.co.id);
       if (!groupMap[gk]) {
         groupMap[gk] = {
           ...it,
@@ -2010,7 +2028,7 @@ function pgZonaItems(zonaEnc) {
       '<span class="badge b-vio" style="font-size:10px">REQ</span>';
     const prepBadge = isDone ? '<span class="badge b-ok">✅ Completo</span>'
                     : isParcial ? '<span class="badge b-wa">⏳ Parcial</span>' : '';
-    const gKey = item.referencia + '|' + item.bodega + '|' + item._tipo;
+    const gKey = item.referencia + '|' + item.bodega + '|' + item._tipo + '|' + (item.co || G.co.id);
     html += `<div class="item-card ${isDone?'done':''}" onclick="openItemModal('${encodeURIComponent(gKey)}')">
       <div class="ic-main">
         <div class="ic-ref">${e(String(item.referencia))} · ${e(String(item.bodega||''))} ${tipoTag}</div>
@@ -2088,7 +2106,7 @@ function openItemModal(itemId, tipo) {
 async function confirmarGrupo(gKeyEnc, estado) {
   document.getElementById('itmModal')?.remove();
   const gKey = decodeURIComponent(gKeyEnc);
-  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo+'|'+(i.co||G.co.id)) === gKey);
   if (!group) return;
   ld('Guardando...');
   try {
@@ -2111,7 +2129,7 @@ async function confirmarGrupo(gKeyEnc, estado) {
 function openParcialModal(gKeyEnc) {
   document.getElementById('itmModal')?.remove();
   const gKey = decodeURIComponent(gKeyEnc);
-  const item = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  const item = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo+'|'+(i.co||G.co.id)) === gKey);
   if (!item) return;
   const gKeyE = gKeyEnc;
   document.body.insertAdjacentHTML('beforeend', `
@@ -2147,7 +2165,7 @@ async function saveParcial(gKeyEnc) {
   const nota   = document.getElementById('parNota').value;
   document.getElementById('parModal')?.remove();
   const gKey = decodeURIComponent(gKeyEnc);
-  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo+'|'+(i.co||G.co.id)) === gKey);
   if (!group) return;
   const m = motivo + (nota ? ': ' + nota : '');
   ld('Guardando...');
@@ -2306,7 +2324,7 @@ function filtrarLog() {
 function abrirConfirmacionCantidad(gKeyEnc) {
   document.getElementById('itmModal')?.remove();
   const gKey = decodeURIComponent(gKeyEnc);
-  const item = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo)===gKey);
+  const item = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo+'|'+(i.co||G.co.id))===gKey);
   if (!item) return;
   const cantTotal = item.cant_total || item.cant_comprometida || 0;
   const um = e(String(item.um_emp||item.um||'UND'));
@@ -2369,7 +2387,7 @@ async function procesarConfirmacionCantidad(gKeyEnc, cantMax) {
   if (cantConf < cantMax) {
     // Abre modal de parcial con la cantidad ya ingresada
     const gKey = decodeURIComponent(gKeyEnc);
-    const item = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo)===gKey);
+    const item = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo+'|'+(i.co||G.co.id))===gKey);
     if (!item) return;
     const gKeyE = gKeyEnc;
     const um2 = e(String(item.um_emp||item.um||''));
@@ -2402,7 +2420,7 @@ async function saveParcialConCantidad(gKeyEnc, cantConf) {
   document.getElementById('parModal')?.remove();
   // Reutiliza saveParcial setting qty manually
   const gKey = decodeURIComponent(gKeyEnc);
-  const group = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo)===gKey);
+  const group = _alItems.find(i=>(i.referencia+'|'+i.bodega+'|'+i._tipo+'|'+(i.co||G.co.id))===gKey);
   if (!group) return;
   const m = motivo + (nota ? ': '+nota : '');
   ld('Guardando...');
@@ -2800,8 +2818,8 @@ function pickingConfirmar() {
 async function pickingGuardar(estado, cantConf, motivo) {
   const item  = _pi();
   const idx   = _piIdx();
-  const gKey  = item.referencia + '|' + item.bodega + '|' + item._tipo;
-  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  const gKey  = item.referencia + '|' + item.bodega + '|' + item._tipo + '|' + (item.co || G.co.id);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo+'|'+(i.co||G.co.id)) === gKey);
   if (!group) return;
   ld('Guardando...');
   try {
@@ -2842,8 +2860,8 @@ async function pickingGuardar(estado, cantConf, motivo) {
 async function pickingDeshacer() {
   const item  = _pi();
   const idx   = _piIdx();
-  const gKey  = item.referencia + '|' + item.bodega + '|' + item._tipo;
-  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  const gKey  = item.referencia + '|' + item.bodega + '|' + item._tipo + '|' + (item.co || G.co.id);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo+'|'+(i.co||G.co.id)) === gKey);
   if (!group) return;
   ld('Deshaciendo...');
   try {
@@ -3224,7 +3242,7 @@ function buscarReferencia(q) {
   el.innerHTML = found.map(item => {
     const prep = item.estado_prep || 'pendiente';
     const cls = prep==='completo'?'b-ok':prep==='parcial'?'b-wa':'b-gray';
-    const gKey = encodeURIComponent(item.referencia+'|'+item.bodega+'|'+item._tipo);
+    const gKey = encodeURIComponent(item.referencia+'|'+item.bodega+'|'+item._tipo+'|'+(item.co||G.co.id));
     return `<div class="search-row" onclick="irAItem('${gKey}','${encodeURIComponent(item._zona||'SIN ZONA')}')">
       <div style="font-size:11px;color:var(--mut)">${e(item.referencia)} · ${e(item.bodega||'')}</div>
       <div style="font-weight:700;font-size:13px">${e(item.desc_item||'—')}</div>
@@ -3308,7 +3326,7 @@ function procesarCodigoBarras(codigo) {
     toast('Código no encontrado: ' + q, 'wa'); return;
   }
   if (found.length === 1) {
-    const gKey = encodeURIComponent(found[0].referencia+'|'+found[0].bodega+'|'+found[0]._tipo);
+    const gKey = encodeURIComponent(found[0].referencia+'|'+found[0].bodega+'|'+found[0]._tipo+'|'+(found[0].co||G.co.id));
     _alZona = found[0]._zona || 'SIN ZONA';
     openItemModal(gKey);
   } else {
