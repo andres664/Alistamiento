@@ -941,9 +941,9 @@ function renderTablaUsuarios(rows, filtros = {}) {
     <button class="hdr-btn" onclick="openNuevoUsuario()">＋</button>
   </div>
   <div class="filter-bar">
-    <input id="uf1" placeholder="🔍 Nombre" value="${e(filtros.nom||'')}" oninput="window.uFiltros.nom=this.value;window.uFiltros=window.uFiltros;renderTablaUsuarios(window._uRows,window.uFiltros)"/>
-    <input id="uf2" placeholder="🔍 CO" value="${e(filtros.co||'')}" oninput="window.uFiltros.co=this.value;renderTablaUsuarios(window._uRows,window.uFiltros)"/>
-    <input id="uf3" placeholder="🔍 Perfil" value="${e(filtros.per||'')}" oninput="window.uFiltros.per=this.value;renderTablaUsuarios(window._uRows,window.uFiltros)"/>
+    <input id="uf1" placeholder="🔍 Nombre" value="${e(filtros.nom||'')}" oninput="window.uFiltros.nom=this.value;refreshUsuariosTbody(window._uRows,window.uFiltros)"/>
+    <input id="uf2" placeholder="🔍 CO" value="${e(filtros.co||'')}" oninput="window.uFiltros.co=this.value;refreshUsuariosTbody(window._uRows,window.uFiltros)"/>
+    <input id="uf3" placeholder="🔍 Perfil" value="${e(filtros.per||'')}" oninput="window.uFiltros.per=this.value;refreshUsuariosTbody(window._uRows,window.uFiltros)"/>
   </div>
   <div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
     <span style="font-size:12px;color:var(--mut);flex:1">${datos.length} usuarios</span>
@@ -974,6 +974,30 @@ function renderTablaUsuarios(rows, filtros = {}) {
   <div style="padding:10px 14px"><button class="btn btn-pr" onclick="saveUsuarios()">💾 Guardar cambios</button></div>`;
   window._uRows = rows; window.uFiltros = filtros;
   rdr(html);
+}
+
+
+function refreshUsuariosTbody(rows, filtros) {
+  window._uRows = rows; window.uFiltros = filtros;
+  let datos = rows;
+  if (filtros.nom) datos = datos.filter(r => String(r.nombre||'').toLowerCase().includes(filtros.nom.toLowerCase()));
+  if (filtros.co)  datos = datos.filter(r => String(r.centros_operacion||'').includes(filtros.co));
+  if (filtros.per) datos = datos.filter(r => String(r.perfiles||'').toLowerCase().includes(filtros.per.toLowerCase()));
+  const tbody = document.getElementById('uTbl')?.querySelector('tbody');
+  if (!tbody) { renderTablaUsuarios(rows, filtros); return; }
+  tbody.innerHTML = datos.map(row => {
+    const uEnc = encodeURIComponent(JSON.stringify({id:row.id,usuario_id:row.usuario_id,nombre:row.nombre,contrasena:row.contrasena,centros_operacion:row.centros_operacion,perfiles:row.perfiles,activo:row.activo}));
+    return '<tr data-id="' + row.id + '" data-dirty="">'
+      + '<td><input type="checkbox" class="usr-sel" data-id="' + row.id + '" style="cursor:pointer"/></td>'
+      + '<td>' + e(String(row.usuario_id||'')) + '</td>'
+      + '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + e(String(row.nombre||'')) + '</td>'
+      + '<td style="font-size:11px">' + e(String(row.centros_operacion||'')) + '</td>'
+      + '<td style="font-size:11px">' + e(String(row.perfiles||'')) + '</td>'
+      + '<td style="text-align:center"><span class="badge ' + (row.activo?'b-ok':'b-gray') + '">' + (row.activo?'Sí':'No') + '</span></td>'
+      + '<td style="white-space:nowrap">'
+      + '<button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" onclick="openDetalleRow(\'usuarios\',\'' + uEnc + '\')">✏️</button>'
+      + '</td></tr>';
+  }).join('');
 }
 
 function markDirtyU(el) { el.closest('tr').dataset.dirty = '1'; }
@@ -1083,10 +1107,10 @@ function renderTablaBodegas(rows, filtros = {}) {
     <span class="hdr-sub">${rows.length}</span>
   </div>
   <div class="filter-bar">
-    <input id="bf1" placeholder="🔍 Código" value="${e(filtros.cod||'')}" oninput="window.bFiltros.cod=this.value;renderTablaBodegas(window._bRows,window.bFiltros)"/>
-    <input id="bf2" placeholder="🔍 Descripción" value="${e(filtros.desc||'')}" oninput="window.bFiltros.desc=this.value;renderTablaBodegas(window._bRows,window.bFiltros)"/>
-    <input id="bf3" placeholder="🔍 Ciudad" value="${e(filtros.ciu||'')}" oninput="window.bFiltros.ciu=this.value;renderTablaBodegas(window._bRows,window.bFiltros)"/>
-    <input id="bf4" placeholder="🔍 CO" value="${e(filtros.co||'')}" oninput="window.bFiltros.co=this.value;renderTablaBodegas(window._bRows,window.bFiltros)"/>
+    <input id="bf1" placeholder="🔍 Código" value="${e(filtros.cod||'')}" oninput="window.bFiltros.cod=this.value;refreshBodegasTbody(window._bRows,window.bFiltros)"/>
+    <input id="bf2" placeholder="🔍 Descripción" value="${e(filtros.desc||'')}" oninput="window.bFiltros.desc=this.value;refreshBodegasTbody(window._bRows,window.bFiltros)"/>
+    <input id="bf3" placeholder="🔍 Ciudad" value="${e(filtros.ciu||'')}" oninput="window.bFiltros.ciu=this.value;refreshBodegasTbody(window._bRows,window.bFiltros)"/>
+    <input id="bf4" placeholder="🔍 CO" value="${e(filtros.co||'')}" oninput="window.bFiltros.co=this.value;refreshBodegasTbody(window._bRows,window.bFiltros)"/>
   </div>
   <div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
     <span style="font-size:12px;color:var(--mut);flex:1">${datos.length} de ${rows.length}</span>
@@ -1119,6 +1143,32 @@ function renderTablaBodegas(rows, filtros = {}) {
   <div style="padding:8px 14px"><button class="btn btn-pr" onclick="saveBodegas()">💾 Guardar cambios</button></div>`;
   window._bRows = rows; window.bFiltros = filtros;
   rdr(html);
+}
+
+
+function refreshBodegasTbody(rows, filtros) {
+  window._bRows = rows; window.bFiltros = filtros;
+  let datos = rows;
+  if (filtros.cod)  datos = datos.filter(r => String(r.codigo||'').toLowerCase().includes(filtros.cod.toLowerCase()));
+  if (filtros.desc) datos = datos.filter(r => String(r.descripcion||'').toLowerCase().includes(filtros.desc.toLowerCase()));
+  if (filtros.ciu)  datos = datos.filter(r => String(r.desc_ciudad||'').toLowerCase().includes(filtros.ciu.toLowerCase()));
+  if (filtros.co)   datos = datos.filter(r => String(r.co||'').includes(filtros.co));
+  const tbody = document.getElementById('bodTbl')?.querySelector('tbody');
+  if (!tbody) { renderTablaBodegas(rows, filtros); return; }
+  tbody.innerHTML = datos.map(r => {
+    const bEnc = encodeURIComponent(JSON.stringify({id:r.id,codigo:r.codigo,descripcion:r.descripcion,co:r.co,instalacion:r.instalacion,desc_co:r.desc_co,estado:r.estado,departamento:r.departamento,ciudad:r.ciudad,desc_departamento:r.desc_departamento,desc_ciudad:r.desc_ciudad,direccion:r.direccion,notas:r.notas}));
+    return '<tr data-id="' + r.id + '" data-dirty="">'
+      + '<td><input type="checkbox" class="bod-sel" data-id="' + r.id + '" style="cursor:pointer"/></td>'
+      + '<td style="white-space:nowrap">' + e(String(r.codigo||'')) + '</td>'
+      + '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + e(String(r.descripcion||'')) + '">' + e(String(r.descripcion||'')) + '</td>'
+      + '<td>' + e(String(r.co||'')) + '</td>'
+      + '<td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + e(String(r.desc_ciudad||'')) + '</td>'
+      + '<td>' + e(String(r.desc_departamento||'')) + '</td>'
+      + '<td><span class="badge ' + (r.estado==='Activo'?'b-ok':'b-gray') + '">' + e(String(r.estado||'')) + '</span></td>'
+      + '<td style="white-space:nowrap">'
+      + '<button class="btn btn-sm" style="background:var(--gold);color:var(--pr);padding:4px 8px" onclick="openDetalleRow(\'bodegas\',\'' + bEnc + '\')">✏️</button>'
+      + '</td></tr>';
+  }).join('');
 }
 
 function markDirtyB(el) { el.closest('tr').dataset.dirty = '1'; }
@@ -1716,11 +1766,15 @@ async function pgAlistador() {
 
     // Enrich items with zona info
     const enrichOne = (it, tipo) => {
-      // Usar el campo bodega del item (ya filtrado por CO al hacer la query)
-      const key = String(it.referencia).trim() + '|' + String(it.bodega).trim();
+      // Para RQT: la bodega de despacho es bodega_salida, no bodega
+      const bodega = tipo === 'requisiciones'
+        ? (String(it.bodega_salida || it.bodega || '').trim())
+        : (String(it.bodega || '').trim());
+      const key = String(it.referencia).trim() + '|' + bodega;
       const z = zonaMap[key] || {};
       return {
         ...it,
+        bodega: bodega,           // normalizar: siempre usar bodega de salida en RQT
         _tipo: tipo,
         _zona: z.zona || 'SIN ZONA',
         _seq: z.secuencia != null ? z.secuencia : 9999,
@@ -1733,25 +1787,29 @@ async function pgAlistador() {
       ...(Array.isArray(req) ? req : []).map(i => enrichOne(i, 'requisiciones')),
     ];
 
-    // Consolidate: group by referencia+bodega, sum quantities
-    // Each group has _items[] (originals) and cant_total (sum)
+    // Consolidate: group by referencia+bodega+co (SIN tipo)
+    // Pedidos y Requisiciones de la misma ref+bodega se suman juntos
     const groupMap = {};
     allRaw.forEach(it => {
-      // Incluir CO en la clave para evitar mezcla entre centros de operación
-      const gk = it.referencia + '|' + it.bodega + '|' + it._tipo + '|' + (it.co || G.co.id);
+      // Sin _tipo en la clave: suma pedidos + req de la misma ref+bodega
+      const gk = it.referencia + '|' + it.bodega + '|' + (it.co || G.co.id);
       if (!groupMap[gk]) {
         groupMap[gk] = {
           ...it,
           cant_total: 0,
           cant_alistada_total: 0,
           _items: [],
-          // Group estado: completo only if ALL done, parcial if some done, else pendiente
+          _tipos: new Set(),     // qué tipos incluye este grupo
           estado_prep: 'pendiente',
         };
       }
       groupMap[gk].cant_total += (parseFloat(it.cant_comprometida) || 0);
       groupMap[gk].cant_alistada_total += (parseFloat(it.cant_alistada) || 0);
       groupMap[gk]._items.push(it);
+      groupMap[gk]._tipos.add(it._tipo);
+      // Mantener um_emp del primer ítem que lo tenga
+      if (!groupMap[gk].um_emp && it.um_emp) groupMap[gk].um_emp = it.um_emp;
+      if (!groupMap[gk].um && it.um) groupMap[gk].um = it.um;
     });
 
     // Compute group estado_prep
@@ -2522,6 +2580,168 @@ function sincronizarSueltas(inp) {
   pickingValidarCant();
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// FLUJO KIT DESGLOSADO: confirmar por componente
+// ═══════════════════════════════════════════════════════════════
+
+// Global: índice del componente activo en flujo kit
+window._kitCompIdx = 0;
+
+function buildKitConfirmSection(kits, cantTotal, umOferta) {
+  if (!kits || !kits.length) return '';
+  // Para cada componente mostrar: cantidad total a preparar y campo de confirmación
+  let html = '<div style="padding:0 14px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px">'
+    + '🎁 CONFIRMA CADA COMPONENTE (' + kits.length + ' en total)</div>';
+
+  kits.forEach((k, idx) => {
+    const cantComp = Math.round(k.qty * cantTotal * 100) / 100;
+    const isFirst  = idx === 0;
+    const compId   = 'kitComp_' + idx;
+    html += '<div id="kitCompCard_' + idx + '" class="confirm-step" style="margin-bottom:8px;'
+      + (isFirst ? 'border-color:var(--gold)' : 'opacity:.5;border-color:var(--bord)') + '">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+      + '<span class="badge ' + (isFirst ? 'b-pr' : 'b-gray') + '" id="kitCompBadge_' + idx + '">'
+      + (isFirst ? (idx+1) + '/' + kits.length : '⬜ ' + (idx+1)) + '</span>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--pr)">' + e(k.ref) + '</div>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--mut);margin-bottom:6px">' + e(k.desc||'') + '</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+      + '<div style="font-size:24px;font-weight:900;color:var(--gold)">' + fmtn(cantComp) + '</div>'
+      + '<div style="font-size:12px;color:var(--mut)">unidades a preparar</div>'
+      + '</div>'
+      // Input de confirmación (oculto hasta que se activa)
+      + '<div id="kitRefSec_' + idx + '" style="display:' + (isFirst ? 'block' : 'none') + '">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--mut);margin-bottom:3px">🔍 Confirma esta referencia</div>'
+      + '<input id="' + compId + '" class="scan-inp" type="text"'
+      + ' placeholder="' + e(k.ref) + '" autocomplete="off" autocorrect="off" spellcheck="false"'
+      + ' data-ref="' + e(k.ref) + '" data-idx="' + idx + '" data-total="' + kits.length + '"'
+      + ' oninput="kitValidarRef(this)" onkeydown="kitRefKeydown(event,this)" />'
+      + '<div id="kitRefFb_' + idx + '" style="font-size:12px;text-align:center;height:16px;margin-top:2px"></div>'
+      + '</div>'
+      // Tick de completado
+      + '<div id="kitCompDone_' + idx + '" style="display:none;color:var(--ok);font-weight:700;font-size:13px">✅ Confirmado</div>'
+      + '</div>';
+  });
+
+  html += '</div>';
+  return html;
+}
+
+// ── Validar referencia de un componente ─────────────────────────
+function kitValidarRef(inp) {
+  const ref  = (inp.dataset.ref || '').trim().toUpperCase();
+  const val  = inp.value.trim().toUpperCase();
+  const idx  = parseInt(inp.dataset.idx) || 0;
+  const fb   = document.getElementById('kitRefFb_' + idx);
+  if (!val) {
+    inp.className = 'scan-inp';
+    if (fb) fb.textContent = '';
+    return;
+  }
+  if (val === ref) {
+    inp.className = 'scan-inp ok';
+    if (fb) fb.innerHTML = '<span style="color:var(--ok);font-weight:700">✅ Correcto</span>';
+  } else if (ref.startsWith(val)) {
+    inp.className = 'scan-inp';
+    if (fb) fb.innerHTML = '<span style="color:var(--wa)">Sigue escribiendo...</span>';
+  } else {
+    inp.className = 'scan-inp er';
+    if (fb) fb.innerHTML = '<span style="color:var(--er);font-weight:700">❌ No coincide</span>';
+  }
+}
+
+// ── Enter en componente: avanzar al siguiente o confirmar ────────
+function kitRefKeydown(event, inp) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    pgZonaItems(encodeURIComponent(_alZona));
+    return;
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const ref = (inp.dataset.ref || '').trim().toUpperCase();
+    const val = inp.value.trim().toUpperCase();
+    if (val !== ref) {
+      toast('❌ Referencia incorrecta', 'er');
+      inp.focus();
+      return;
+    }
+    kitAvanzarComponente(inp);
+  }
+}
+
+function kitAvanzarComponente(inp) {
+  const idx   = parseInt(inp.dataset.idx) || 0;
+  const total = parseInt(inp.dataset.total) || 1;
+
+  // Marcar este componente como confirmado
+  const card  = document.getElementById('kitCompCard_' + idx);
+  const done  = document.getElementById('kitCompDone_' + idx);
+  const refSec = document.getElementById('kitRefSec_' + idx);
+  const badge  = document.getElementById('kitCompBadge_' + idx);
+  if (refSec) refSec.style.display = 'none';
+  if (done)   done.style.display = 'block';
+  if (card)   { card.style.borderColor = 'var(--ok)'; card.style.opacity = '1'; }
+  if (badge)  badge.innerHTML = '✅ ' + (idx+1);
+
+  // ¿Hay más componentes?
+  const nextIdx = idx + 1;
+  if (nextIdx < total) {
+    // Activar el siguiente componente
+    const nextCard    = document.getElementById('kitCompCard_' + nextIdx);
+    const nextRefSec  = document.getElementById('kitRefSec_' + nextIdx);
+    const nextBadge   = document.getElementById('kitCompBadge_' + nextIdx);
+    const nextInp     = document.getElementById('kitComp_' + nextIdx);
+    if (nextCard)   { nextCard.style.opacity = '1'; nextCard.style.borderColor = 'var(--gold)'; }
+    if (nextRefSec) nextRefSec.style.display = 'block';
+    if (nextBadge)  nextBadge.className = 'badge b-pr';
+    if (nextBadge)  nextBadge.textContent = (nextIdx+1) + '/' + total;
+    setTimeout(() => { nextInp?.focus(); }, 100);
+    // Scroll to next
+    nextCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    // Todos los componentes confirmados → confirmar el ítem completo
+    setTimeout(() => pickingConfirmarKit(), 200);
+  }
+}
+
+// ── Confirmar kit completo (todos los componentes validados) ─────
+function pickingConfirmarKit() {
+  const item  = _pi();
+  if (!item) return;
+  const kits  = _kitsMap[String(item.referencia)] || [];
+  const total = kits.length;
+
+  // Verificar que TODOS los componentes estén confirmados
+  let allConfirmed = true;
+  for (let i = 0; i < total; i++) {
+    const inp = document.getElementById('kitComp_' + i);
+    if (!inp) { allConfirmed = false; break; }
+    const ref = (inp.dataset.ref || '').trim().toUpperCase();
+    const val = inp.value.trim().toUpperCase();
+    if (val !== ref) {
+      allConfirmed = false;
+      // Activar el componente no confirmado
+      const refSec = document.getElementById('kitRefSec_' + i);
+      if (refSec) refSec.style.display = 'block';
+      const card   = document.getElementById('kitCompCard_' + i);
+      if (card) { card.style.borderColor = 'var(--gold)'; card.style.opacity = '1'; }
+      setTimeout(() => { inp.focus(); }, 100);
+      card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast('Confirma la referencia ' + ref + ' primero', 'wa');
+      break;
+    }
+  }
+
+  if (!allConfirmed) return;
+
+  // Todos confirmados: guardar como completo sin pedir cantidad
+  // (la cantidad ya está definida por el kit — cant_total de la oferta)
+  pickingGuardar('completo', _piMax(), null);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // FLUJO PICKING EN CADENA
 // ═══════════════════════════════════════════════════════════════
@@ -2548,9 +2768,12 @@ function pgPickingItem(idx) {
   const hasPrev  = idx > 0;
   const hasNext  = idx < total - 1;
   const nextPend = _chainItems.findIndex((it, i) => i > idx && it.estado_prep !== 'completo');
-  const tipoTag  = item._tipo === 'pedidos'
-    ? '<span class="badge b-pr" style="font-size:10px">PED</span>'
-    : '<span class="badge b-vio" style="font-size:10px">REQ</span>';
+  const tipos    = item._tipos ? [...item._tipos] : [item._tipo];
+  const tipoTag  = tipos.map(t =>
+    t === 'pedidos'
+      ? '<span class="badge b-pr" style="font-size:10px">PED</span>'
+      : '<span class="badge b-vio" style="font-size:10px">REQ</span>'
+  ).join(' ');
 
   // Store in global so all handlers can access without passing args
   window._pickingItem   = item;
@@ -2630,7 +2853,7 @@ function pgPickingItem(idx) {
         + ' onclick="pgPickingItem(' + (nextPend >= 0 ? nextPend : idx+1) + ')">'
         + (nextPend >= 0 ? 'Siguiente →' : '✅ Fin zona') + '</button>'
       : '<button class="btn btn-sm" style="flex:2;background:var(--gold);color:var(--pr);font-weight:700"'
-        + ' id="btnConfirmar" onclick="pickingConfirmar()">✅ Confirmar</button>')
+        + ' id="btnConfirmar" onclick="' + (showKits ? 'pickingConfirmarKit()' : 'pickingConfirmar()') + '">✅ Confirmar</button>')
     + (hasNext
       ? '<button class="btn btn-sec btn-sm" style="flex:1" onclick="pgPickingItem(' + (idx+1) + ')">Sal. →</button>'
       : '<div style="flex:1"></div>')
@@ -2650,8 +2873,13 @@ function pgPickingItem(idx) {
     const refInp  = document.getElementById('scanRef');
     const cantInp = document.getElementById('cantConfirm');
 
-    refInp.addEventListener('input', () => pickingValidarRef());
-    refInp.addEventListener('keydown', pickingRefKeydown);
+    if (showKits) {
+      // Kit mode: listeners attached per component inside buildKitConfirmSection
+      // Enter key on last component confirms all
+    } else {
+      refInp.addEventListener('input', () => pickingValidarRef());
+      refInp.addEventListener('keydown', pickingRefKeydown);
+    }
 
     // Attach to all quantity inputs (single OR cajas+sueltas)
     const cantInputs = [
@@ -2975,72 +3203,126 @@ document.addEventListener('keydown', function(e) {
 async function pgDashboard() {
   ld('Cargando dashboard...');
   try {
-    const [ped, req] = await Promise.all([
-      sb.from('pedidos').select('bodega,zona_logistica,estado_prep,cant_comprometida,cant_alistada').eq('co', G.co.id),
-      sb.from('requisiciones').select('bodega,estado_prep,cant_comprometida,cant_alistada').eq('co', G.co.id),
+    const [ped, req, zonas] = await Promise.all([
+      sb.from('pedidos').select('nro_documento,referencia,bodega,zona_logistica,estado_prep,cant_comprometida,cant_alistada').eq('co', G.co.id),
+      sb.from('requisiciones').select('nro_documento,referencia,bodega,bodega_salida,estado_prep,cant_comprometida,cant_alistada').eq('co', G.co.id),
+      sb.from('zonas').select('referencia,bodega_id,zona').eq('co', G.co.id),
     ]);
-    const zonas = await sb.from('zonas').select('referencia,bodega_id,zona,co').eq('co', G.co.id);
     uld();
-    const todos = [
-      ...(Array.isArray(ped)?ped:[]).map(i=>({...i,_tipo:'pedido'})),
-      ...(Array.isArray(req)?req:[]).map(i=>({...i,_tipo:'req'})),
-    ];
-    const total = todos.length;
-    const compl = todos.filter(i=>i.estado_prep==='completo').length;
-    const parc  = todos.filter(i=>i.estado_prep==='parcial').length;
-    const pend  = todos.filter(i=>!i.estado_prep||i.estado_prep==='pendiente').length;
-    const pct   = total ? Math.round((compl+parc)/total*100) : 0;
 
-    // Group by zona
+    // Normalize bodega: RQT uses bodega_salida
+    const pedArr = (Array.isArray(ped)?ped:[]).map(i=>({...i,_tipo:'pedido'}));
+    const reqArr = (Array.isArray(req)?req:[]).map(i=>({...i,
+      bodega: String(i.bodega_salida||i.bodega||'').trim(),
+      _tipo:'req'
+    }));
+    const todos = [...pedArr, ...reqArr];
+
+    // zonaMap: referencia|bodega → zona
     const zonaMap = {};
     (Array.isArray(zonas)?zonas:[]).forEach(z => {
-      zonaMap[z.referencia+'|'+z.bodega_id] = z.zona || 'SIN ZONA';
+      zonaMap[String(z.referencia).trim()+'|'+String(z.bodega_id).trim()] = z.zona || 'SIN ZONA';
     });
+
+    // Métricas por REFERENCIA (líneas)
+    const totalR = todos.length;
+    const complR = todos.filter(i=>i.estado_prep==='completo').length;
+    const parcR  = todos.filter(i=>i.estado_prep==='parcial').length;
+    const pendR  = todos.filter(i=>!i.estado_prep||i.estado_prep==='pendiente').length;
+    const pctR   = totalR ? Math.round((complR+parcR)/totalR*100) : 0;
+
+    // Métricas por DOCUMENTO único
+    const docsPed = new Set(pedArr.map(i=>i.nro_documento).filter(Boolean));
+    const docsReq = new Set(reqArr.map(i=>i.nro_documento).filter(Boolean));
+    const docsComplPed = new Set(pedArr.filter(i=>i.estado_prep==='completo').map(i=>i.nro_documento));
+    // Un documento completo = todos sus ítems completos
+    const docsPedStatus = {};
+    pedArr.forEach(i => {
+      if (!docsPedStatus[i.nro_documento]) docsPedStatus[i.nro_documento] = {total:0,compl:0};
+      docsPedStatus[i.nro_documento].total++;
+      if (i.estado_prep==='completo') docsPedStatus[i.nro_documento].compl++;
+    });
+    const docsReqStatus = {};
+    reqArr.forEach(i => {
+      if (!docsReqStatus[i.nro_documento]) docsReqStatus[i.nro_documento] = {total:0,compl:0};
+      docsReqStatus[i.nro_documento].total++;
+      if (i.estado_prep==='completo') docsReqStatus[i.nro_documento].compl++;
+    });
+    const pedComplDocs = Object.values(docsPedStatus).filter(d=>d.compl===d.total).length;
+    const reqComplDocs = Object.values(docsReqStatus).filter(d=>d.compl===d.total).length;
+
+    // Cantidades
+    const cantTotal = todos.reduce((s,i)=>s+(parseFloat(i.cant_comprometida)||0),0);
+    const cantAlist = todos.reduce((s,i)=>s+(parseFloat(i.cant_alistada)||0),0);
+
+    // Avance por zona
     const byZona = {};
     todos.forEach(it => {
-      const z = zonaMap[it.referencia+'|'+it.bodega] || 'SIN ZONA';
-      if (!byZona[z]) byZona[z] = {total:0,compl:0,parc:0};
-      byZona[z].total++;
-      if (it.estado_prep==='completo') byZona[z].compl++;
-      else if (it.estado_prep==='parcial') byZona[z].parc++;
+      const z = zonaMap[String(it.referencia).trim()+'|'+String(it.bodega).trim()] || 'SIN ZONA';
+      if (!byZona[z]) byZona[z] = {refs:0,complRefs:0,cant:0,cantAlist:0};
+      byZona[z].refs++;
+      if (it.estado_prep==='completo'||it.estado_prep==='parcial') byZona[z].complRefs++;
+      byZona[z].cant += parseFloat(it.cant_comprometida)||0;
+      byZona[z].cantAlist += parseFloat(it.cant_alistada)||0;
     });
 
-    let zonaBars = Object.entries(byZona).sort((a,b)=>b[1].total-a[1].total).map(([zona,info])=>{
-      const zp = info.total ? Math.round((info.compl+info.parc)/info.total*100) : 0;
-      const col = zp===100?'var(--ok)':zp>50?'var(--gold)':'var(--er)';
-      return '<div class="zona-bar">'
-        + '<div class="zona-bar-name">' + e(zona) + '</div>'
-        + '<div class="zona-bar-bg"><div class="zona-bar-fill" style="width:' + zp + '%;background:' + col + '"></div></div>'
-        + '<div class="zona-bar-pct">' + zp + '%</div>'
-        + '<div style="font-size:10px;color:var(--mut)">' + (info.compl+info.parc) + '/' + info.total + '</div>'
-        + '</div>';
-    }).join('');
+    const zonaBars = Object.entries(byZona)
+      .sort((a,b)=>b[1].refs-a[1].refs)
+      .map(([zona,info])=>{
+        const zp  = info.refs ? Math.round(info.complRefs/info.refs*100) : 0;
+        const col = zp===100?'var(--ok)':zp>50?'var(--gold)':'var(--er)';
+        const pctCant = info.cant ? Math.round(info.cantAlist/info.cant*100) : 0;
+        return '<div class="zona-bar">'
+          + '<div class="zona-bar-name">' + e(zona) + '</div>'
+          + '<div class="zona-bar-bg"><div class="zona-bar-fill" style="width:'+zp+'%;background:'+col+'"></div></div>'
+          + '<div style="min-width:90px;text-align:right;font-size:11px">'
+          + '<span style="color:'+col+';font-weight:700">'+zp+'%</span>'
+          + ' <span style="color:var(--mut)">'+info.complRefs+'/'+info.refs+' refs</span>'
+          + '</div>'
+          + '</div>';
+      }).join('') || '<div style="color:var(--mut);font-size:13px">Sin datos de zonas</div>';
 
-    // Cant total vs alistada
-    const cantTotal  = todos.reduce((s,i)=>s+(parseFloat(i.cant_comprometida)||0),0);
-    const cantAlist  = todos.reduce((s,i)=>s+(parseFloat(i.cant_alistada)||0),0);
-
-    const zonasBarsHtml = zonaBars || '<div style="color:var(--mut);font-size:13px">Sin datos de zonas</div>';
     rdr('<div class="hdr">'
       + '<button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>'
       + '<h1>📊 Dashboard</h1><span class="hdr-sub">CO ' + G.co.id + '</span></div>'
+
+      // Barra global
       + '<div style="padding:10px 14px 4px">'
-      + '<div class="prog-bg" style="height:14px"><div class="prog-fill" style="width:' + pct + '%"></div></div>'
-      + '<div style="text-align:center;font-size:13px;font-weight:700;margin-top:4px;color:var(--gold)">' + pct + '% completado</div></div>'
-      + '<div class="dash-grid">'
-      + '<div class="dash-card" style="border-left:4px solid var(--ok)"><div class="dash-title">✅ Completos</div>'
-      + '<div class="dash-big" style="color:var(--ok)">' + compl + '</div>'
-      + '<div class="dash-sub">' + (total ? Math.round(compl/total*100) : 0) + '% del total</div></div>'
-      + '<div class="dash-card" style="border-left:4px solid var(--wa)"><div class="dash-title">⏳ Parciales</div>'
-      + '<div class="dash-big" style="color:var(--wa)">' + parc + '</div>'
-      + '<div class="dash-sub">' + (total ? Math.round(parc/total*100) : 0) + '% del total</div></div>'
-      + '<div class="dash-card" style="border-left:4px solid var(--mut)"><div class="dash-title">⬜ Pendientes</div>'
-      + '<div class="dash-big" style="color:var(--mut)">' + pend + '</div>'
-      + '<div class="dash-sub">' + (total ? Math.round(pend/total*100) : 0) + '% del total</div></div>'
-      + '<div class="dash-card" style="border-left:4px solid var(--gold)"><div class="dash-title">📦 Cantidades</div>'
-      + '<div class="dash-big">' + fmtn(Math.round(cantAlist)) + '</div>'
-      + '<div class="dash-sub">de ' + fmtn(Math.round(cantTotal)) + ' totales</div></div></div>'
-      + '<div class="dash-card-full"><div class="dash-title">📍 Avance por zona</div>' + zonasBarsHtml + '</div>'
+      + '<div class="prog-bg" style="height:14px"><div class="prog-fill" style="width:'+pctR+'%"></div></div>'
+      + '<div style="text-align:center;font-size:13px;font-weight:700;margin-top:4px;color:var(--gold)">'+pctR+'% referencias completadas</div>'
+      + '</div>'
+
+      // Stat grid — referencias
+      + '<div style="padding:4px 14px 2px;font-size:11px;font-weight:700;color:var(--mut)">POR REFERENCIAS</div>'
+      + '<div class="stat-grid">'
+      + '<div class="stat-box"><div class="stat-n" style="color:var(--ok)">'+complR+'</div><div class="stat-l">✅ Completas</div></div>'
+      + '<div class="stat-box"><div class="stat-n" style="color:var(--wa)">'+parcR+'</div><div class="stat-l">⏳ Parciales</div></div>'
+      + '<div class="stat-box"><div class="stat-n" style="color:var(--mut)">'+pendR+'</div><div class="stat-l">⬜ Pendientes</div></div>'
+      + '</div>'
+
+      // Stat grid — documentos
+      + '<div style="padding:4px 14px 2px;font-size:11px;font-weight:700;color:var(--mut)">POR DOCUMENTOS</div>'
+      + '<div class="dash-grid" style="margin:0 14px 8px">'
+      + '<div class="dash-card" style="border-left:3px solid var(--pr)">'
+      + '<div class="dash-title">📦 Pedidos</div>'
+      + '<div style="font-size:22px;font-weight:800;color:var(--ok)">'+pedComplDocs+'</div>'
+      + '<div class="dash-sub">de '+docsPed.size+' completos</div></div>'
+      + '<div class="dash-card" style="border-left:3px solid #7c3aed">'
+      + '<div class="dash-title">🔄 Requisiciones</div>'
+      + '<div style="font-size:22px;font-weight:800;color:var(--ok)">'+reqComplDocs+'</div>'
+      + '<div class="dash-sub">de '+docsReq.size+' completas</div></div>'
+      + '</div>'
+
+      // Cantidades
+      + '<div class="dash-card-full" style="margin-bottom:8px">'
+      + '<div class="dash-title">📦 Cantidades</div>'
+      + '<div style="display:flex;align-items:center;gap:12px">'
+      + '<div class="prog-bg" style="flex:1;height:10px"><div class="prog-fill" style="width:'+(cantTotal?Math.round(cantAlist/cantTotal*100):0)+'%"></div></div>'
+      + '<div style="font-size:13px;font-weight:700">'+fmtn(Math.round(cantAlist))+' / '+fmtn(Math.round(cantTotal))+'</div>'
+      + '</div></div>'
+
+      // Avance por zona
+      + '<div class="dash-card-full"><div class="dash-title">📍 Avance por zona</div>' + zonaBars + '</div>'
       + '<div style="padding:0 14px 12px"><button class="btn btn-pr" style="color:var(--gold)" onclick="pgDashboard()">🔄 Actualizar</button></div>'
     );
   } catch(err) { uld(); toast('Error: '+err.message,'er'); }
@@ -3050,48 +3332,122 @@ async function pgDashboard() {
 // 2. SUPERVISIÓN EN VIVO
 // ═══════════════════════════════════════════════════════════
 async function pgSupervisionVivo() {
-  ld('Cargando...');
+  ld('Cargando estado en vivo...');
   try {
-    const sesiones = await sb.from('sesiones_activas').select('*');
+    // Cargar avance actual de pedidos y requisiciones
+    const [ped, req] = await Promise.all([
+      sb.from('pedidos').select('nro_documento,referencia,bodega,estado_prep,cant_comprometida,cant_alistada,co').eq('co', G.co.id),
+      sb.from('requisiciones').select('nro_documento,referencia,bodega,bodega_salida,estado_prep,cant_comprometida,cant_alistada,co').eq('co', G.co.id),
+    ]);
     uld();
-    const data = Array.isArray(sesiones) ? sesiones : [];
-    let rows = data.length === 0
-      ? '<div style="text-align:center;color:var(--mut);padding:24px">No hay alistadores activos en este momento</div>'
-      : data.map(s =>
-          '<div class="live-row">'
+
+    const pedArr = Array.isArray(ped) ? ped : [];
+    const reqArr = Array.isArray(req) ? req : [];
+    const todos  = [
+      ...pedArr.map(i=>({...i,_tipo:'pedido'})),
+      ...reqArr.map(i=>({...i,bodega:i.bodega_salida||i.bodega,_tipo:'req'})),
+    ];
+
+    // Agrupar por estado
+    const totalRef  = todos.length;
+    const complRef  = todos.filter(i=>i.estado_prep==='completo').length;
+    const parcRef   = todos.filter(i=>i.estado_prep==='parcial').length;
+    const pendRef   = todos.filter(i=>!i.estado_prep||i.estado_prep==='pendiente').length;
+    const pct = totalRef ? Math.round((complRef+parcRef)/totalRef*100) : 0;
+
+    // Últimas actualizaciones (ítems con estado != pendiente)
+    const activos = todos
+      .filter(i=>i.estado_prep && i.estado_prep!=='pendiente')
+      .slice(-20).reverse();
+
+    // Sesiones activas (si existe la tabla)
+    let sesiones = [];
+    try {
+      const s = await sb.from('sesiones_activas').select('*').eq('co', G.co.id);
+      sesiones = Array.isArray(s) ? s : [];
+    } catch(e) {}
+
+    let html = '<div class="hdr">'
+      + '<button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>'
+      + '<h1>👁️ En vivo</h1>'
+      + '<button class="hdr-btn" onclick="pgSupervisionVivo()" style="background:rgba(255,255,255,.15)">🔄</button>'
+      + '</div>'
+      + '<div style="padding:8px 14px 4px">'
+      + '<div class="prog-bg" style="height:10px"><div class="prog-fill" style="width:'+pct+'%"></div></div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:3px">'
+      + '<span>✅ '+complRef+' completas</span>'
+      + '<span>⏳ '+parcRef+' parciales</span>'
+      + '<span>⬜ '+pendRef+' pendientes</span>'
+      + '</div></div>';
+
+    // Alistadores activos (de sesiones_activas si existe)
+    if (sesiones.length > 0) {
+      html += '<div class="card"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🟢 Alistadores activos</div>';
+      sesiones.forEach(s => {
+        html += '<div class="live-row">'
           + '<div class="live-dot"></div>'
           + '<div style="flex:1">'
           + '<div class="live-name">' + e(s.usuario_nombre||'—') + '</div>'
-          + '<div class="live-zona">📍 ' + e(s.zona_actual||'Sin zona') + ' · CO ' + e(s.co||'') + '</div>'
+          + '<div class="live-zona">📍 ' + e(s.zona_actual||'Sin zona') + '</div>'
           + '</div>'
-          + '<div style="text-align:right">'
-          + '<div style="font-size:11px;color:var(--mut)">' + e(String(s.actualizado_en||'').replace('T',' ').substring(0,16)) + '</div>'
-          + '<div class="timer-box" style="margin-top:4px">' + calcTiempoDesde(s.inicio_sesion) + '</div>'
-          + '</div></div>'
-        ).join('');
+          + '<div class="timer-box">' + calcTiempoDesde(s.inicio_sesion) + '</div>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
 
-    rdr(`<div class="hdr">
-      <button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>
-      <h1>👁️ En vivo</h1>
-      <span class="hdr-sub">${data.length} activos</span>
-    </div>
-    <div class="card">${rows}</div>
-    <div style="padding:0 14px">
-      <button class="btn btn-pr" style="color:var(--gold)" onclick="pgSupervisionVivo()">🔄 Actualizar</button>
-    </div>`);
-  } catch(err) {
-    uld();
-    // Tabla puede no existir aún — mostrar pantalla vacía con instrucción
-    rdr(`<div class="hdr">
-      <button class="hdr-btn" onclick="pgSupervisor()">← Supervisor</button>
-      <h1>👁️ En vivo</h1>
-    </div>
-    <div class="card" style="text-align:center;color:var(--mut)">
-      <div style="font-size:32px;margin-bottom:8px">🔧</div>
-      <div style="font-weight:700">Requiere SQL adicional</div>
-      <div style="font-size:12px;margin-top:6px">Ejecuta el SQL de sesiones_activas en Supabase para activar esta función.</div>
-    </div>`);
-  }
+    // Ítems recientemente trabajados
+    html += '<div class="card"><div style="font-weight:700;font-size:13px;margin-bottom:8px">'
+      + '📋 Últimas preparaciones (' + activos.length + ')</div>';
+    if (activos.length === 0) {
+      html += '<div style="text-align:center;color:var(--mut);padding:16px">Sin actividad reciente</div>';
+    } else {
+      activos.forEach(it => {
+        const cls = it.estado_prep==='completo'?'b-ok':'b-wa';
+        const ico = it.estado_prep==='completo'?'✅':'⏳';
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bord)">'
+          + '<span class="badge '+cls+'">'+ico+'</span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+e(it.referencia||'')+'</div>'
+          + '<div style="font-size:11px;color:var(--mut)">'+e(it.bodega||'')+' · '+e(it._tipo==='pedido'?'Pedido':'Req.')+'</div>'
+          + '</div>'
+          + '<div style="font-size:11px;text-align:right;color:var(--mut)">'
+          + fmtn(it.cant_alistada||0)+'/'+fmtn(it.cant_comprometida||0)+'</div>'
+          + '</div>';
+      });
+    }
+    html += '</div>';
+    rdr(html);
+  } catch(err) { uld(); toast('Error: '+err.message,'er'); }
+}
+
+
+async function validarHistorial(id) {
+  if (!confirm('¿Validar este alistamiento?')) return;
+  ld('Validando...');
+  try {
+    await sb.from('historial_alistamientos').update({
+      validado_supervisor: true,
+      validado_por: G.user.nombre,
+    }).eq('id', id);
+    uld(); toast('✅ Alistamiento validado');
+    pgHistorialAlistamientos();
+  } catch(e) { uld(); toast('Error: '+e.message,'er'); }
+}
+
+async function rechazarHistorial(id) {
+  const nota = prompt('Motivo del rechazo (opcional):');
+  if (nota === null) return;
+  ld('Rechazando...');
+  try {
+    await sb.from('historial_alistamientos').update({
+      validado_supervisor: false,
+      validado_por: null,
+      notas_supervisor: nota || 'Rechazado por ' + G.user.nombre,
+    }).eq('id', id);
+    uld(); toast('↩ Devuelto para corrección', 'wa');
+    pgHistorialAlistamientos();
+  } catch(e) { uld(); toast('Error: '+e.message,'er'); }
 }
 
 function calcTiempoDesde(iso) {
@@ -3128,7 +3484,14 @@ async function pgHistorialAlistamientos() {
           ${r.duracion_minutos ? `<span class="badge b-gray">⏱ ${r.duracion_minutos} min</span>` : ''}
           ${r.usuario_nombre ? `<span class="badge b-gray">👤 ${e(r.usuario_nombre)}</span>` : ''}
         </div>
-        ${r.validado_supervisor ? '<div class="valid-badge valid-ok" style="margin-top:6px">✅ Validado por supervisor</div>' : '<div class="valid-badge valid-pend" style="margin-top:6px">⏳ Pendiente validación</div>'}
+        ${r.validado_supervisor
+          ? '<div class="valid-badge valid-ok" style="margin-top:6px">✅ Validado por ' + e(r.validado_por||'supervisor') + '</div>'
+          : '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">'
+            + '<div class="valid-badge valid-pend" style="flex:1">⏳ Pendiente validación</div>'
+            + '<button class="btn btn-sm" style="background:var(--ok);color:#fff;padding:6px 12px" onclick="validarHistorial(' + r.id + ')">✅ Validar</button>'
+            + '<button class="btn btn-sm btn-er" style="padding:6px 12px" onclick="rechazarHistorial(' + r.id + ')">↩ Rechazar</button>'
+            + '</div>'
+        }
       </div>`;
     });
     rdr(html);
