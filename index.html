@@ -1902,7 +1902,7 @@ function pgMostrarZonas(items) {
   zonaList.forEach(([zona, info]) => {
     const zPct   = info.total ? Math.round(info.done/info.total*100) : 0;
     const allDone = info.done === info.total;
-    html += '<div class="list-item" style="' + (allDone?'opacity:.6':'') + '" onclick="iniciarCadenaFiltrada(' + JSON.stringify(encodeURIComponent(zona)) + ')">'
+    html += '<div class="list-item" style="' + (allDone?'opacity:.6':'') + '" onclick="iniciarCadenaFiltrada(\'' + encodeURIComponent(zona) + '\')">'
       + '<div class="li-icon">' + (allDone ? '✅' : '📦') + '</div>'
       + '<div class="li-body">'
       + '<div class="li-name">' + e(zona) + '</div>'
