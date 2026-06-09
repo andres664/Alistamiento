@@ -261,6 +261,36 @@ function mkSB(url, key) {
 }
 const sb = mkSB(SUPABASE_URL, SUPABASE_KEY);
 
+// ── UM: extraer factor de empaque de "C24", "DP12", etc. ──────
+function factorUM(um) {
+  if (!um) return 1;
+  const s = String(um).trim().toUpperCase();
+  // Formatos: C24, C6, CJ12, DP20, etc. — extraer número al final
+  const m = s.match(/(\d+(?:[.,]\d+)?)$/);
+  if (m) {
+    const n = parseFloat(m[1].replace(',','.'));
+    return n > 1 ? n : 1;
+  }
+  return 1;
+}
+// Convierte unidades totales → { cajas, sueltas } según UM
+function aCajasYSueltas(cant, um) {
+  const f = factorUM(um);
+  if (f <= 1) return { cajas: 0, sueltas: cant, factor: 1 };
+  const cajas   = Math.floor(cant / f);
+  const sueltas = Math.round((cant % f) * 100) / 100;
+  return { cajas, sueltas, factor: f };
+}
+// Formatea cantidad con desglose cajas + sueltas
+function fmtCantUM(cant, um) {
+  const f = factorUM(um);
+  if (f <= 1 || !cant) return fmtn(cant) + ' ' + e(um || 'UND');
+  const { cajas, sueltas } = aCajasYSueltas(cant, um);
+  if (cajas === 0)   return fmtn(sueltas) + ' und';
+  if (sueltas === 0) return fmtn(cajas) + ' caj. (' + fmtn(cant) + ' und)';
+  return fmtn(cajas) + ' caj. + ' + fmtn(sueltas) + ' und &nbsp;<span style="font-size:11px;color:var(--mut)">(' + fmtn(cant) + ' und total)</span>';
+}
+
 // ── Helpers de formato de campos ─────────────────────────────
 // Texto limpio: quita espacios pero preserva ceros a la izquierda
 const txt  = v => (v === null || v === undefined) ? '' : String(v).trim();
@@ -1654,13 +1684,14 @@ let _kitsMap = {};
 let _chainIdx = 0;     // índice del ítem actual en el flujo cadena
 let _chainItems = [];  // lista ordenada de ítems pendientes de la zona activa
 
+// pgAlistador: pantalla de filtros — se llama al entrar al perfil
 async function pgAlistador() {
-  ld('Cargando...');
+  ld('Cargando opciones...');
   try {
-    // Cargar pedidos + requisiciones del CO
+    // Cargar solo lo necesario para poblar filtros
     const [ped, req, kits] = await Promise.all([
       sb.from('pedidos').select('id,nro_documento,referencia,desc_item,bodega,desc_ciudad,zona_logistica,cant_comprometida,um_emp,estado_prep,motivo,cant_alistada,co').eq('co', G.co.id),
-      sb.from('requisiciones').select('id,nro_documento,referencia,desc_item,bodega,cant_comprometida,um,estado_prep,motivo,cant_alistada,co').eq('co', G.co.id),
+      sb.from('requisiciones').select('id,nro_documento,referencia,desc_item,bodega,cant_comprometida,um,um_emp,estado_prep,motivo,cant_alistada,co').eq('co', G.co.id),
       sb.from('kits').select('*'),
     ]);
     // Build kits map
@@ -1723,64 +1754,181 @@ async function pgAlistador() {
 
 function pgAlistadorHome() {
   $fab.style.display = 'none';
+  // Opciones únicas para los filtros (de TODOS los ítems cargados)
+  const zonasLog  = [...new Set(_alItems.map(i => i.zona_logistica||'').filter(Boolean))].sort();
+  const zonasPick = [...new Set(_alItems.map(i => i._zona||'SIN ZONA'))].sort();
+  const bodegas   = [...new Set(_alItems.map(i => i.bodega||'').filter(Boolean))].sort();
+  // Tipos de documento presentes
+  const tienesPed = _alItems.some(i => i._tipo === 'pedidos');
+  const tieneReq  = _alItems.some(i => i._tipo === 'requisiciones');
+
+  // Totales globales para mostrar avance general
   const total = _alItems.length;
   const compl = _alItems.filter(i => i.estado_prep === 'completo').length;
-  const parc  = _alItems.filter(i => i.estado_prep === 'parcial').length;
-  const pend  = _alItems.filter(i => !i.estado_prep || i.estado_prep === 'pendiente').length;
-  const pct   = total ? Math.round((compl + parc) / total * 100) : 0;
+  const pct   = total ? Math.round(compl / total * 100) : 0;
 
-  // Group by zona
+  rdr('<div class="hdr">'
+    + '<button class="hdr-btn" onclick="pgSelectPerfil()">← Perfil</button>'
+    + '<div style="flex:1"><div style="font-weight:700;font-size:15px">📋 Alistador — CO ' + G.co.id + '</div>'
+    + '<div style="font-size:11px;opacity:.85">' + G.co.nombre + ' · ' + pct + '% avance global</div></div>'
+    + '<button class="hdr-btn" onclick="abrirBuscador()" style="background:rgba(255,255,255,.15)">🔍</button>'
+    + '<button class="hdr-btn" onclick="cerrarSesion()" style="background:rgba(255,255,255,.15)">🚪</button>'
+    + '</div>'
+
+    // Progress global
+    + '<div style="padding:6px 14px 2px">'
+    + '<div class="prog-bg" style="height:8px"><div class="prog-fill" style="width:' + pct + '%"></div></div>'
+    + '</div>'
+
+    // Filtros de selección
+    + '<div class="card" style="margin:10px 14px">'
+    + '<div style="font-weight:700;font-size:14px;color:var(--gold);margin-bottom:12px">🎯 Selecciona tu tarea</div>'
+
+    // Zona logística
+    + '<span class="inp-label">Zona logística</span>'
+    + '<select id="filtZonaLog" class="inp" style="margin-bottom:8px">'
+    + '<option value="">Todas</option>'
+    + zonasLog.map(z => '<option>' + e(z) + '</option>').join('')
+    + '</select>'
+
+    // Zona de picking
+    + '<span class="inp-label">Zona de picking</span>'
+    + '<select id="filtZonaPick" class="inp" style="margin-bottom:8px">'
+    + '<option value="">Todas</option>'
+    + zonasPick.map(z => '<option>' + e(z) + '</option>').join('')
+    + '</select>'
+
+    // Bodega
+    + '<span class="inp-label">Bodega</span>'
+    + '<select id="filtBodega" class="inp" style="margin-bottom:8px">'
+    + '<option value="">Todas</option>'
+    + bodegas.map(b => '<option>' + e(b) + '</option>').join('')
+    + '</select>'
+
+    // Tipo de documento
+    + '<span class="inp-label">Tipo de documento</span>'
+    + '<div style="display:flex;gap:10px;margin:6px 0 14px">'
+    + '<label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">'
+    + '<input type="checkbox" id="filtPed" ' + (tienesPed ? 'checked' : 'disabled') + ' style="width:18px;height:18px;cursor:pointer"/>'
+    + ' 📦 Pedidos</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">'
+    + '<input type="checkbox" id="filtReq" ' + (tieneReq  ? 'checked' : 'disabled') + ' style="width:18px;height:18px;cursor:pointer"/>'
+    + ' 🔄 Requisiciones</label>'
+    + '</div>'
+
+    // Botón de inicio
+    + '<button class="btn btn-pr" style="color:var(--gold);font-size:15px;padding:14px" onclick="aplicarFiltrosYMostrarZonas()">'
+    + '▶ Ver zonas de picking'
+    + '</button>'
+    + '</div>'
+  );
+}
+
+// ── Aplica filtros y muestra lista de zonas ──────────────────────
+function aplicarFiltrosYMostrarZonas() {
+  const filtZonaLog  = document.getElementById('filtZonaLog')?.value  || '';
+  const filtZonaPick = document.getElementById('filtZonaPick')?.value || '';
+  const filtBodega   = document.getElementById('filtBodega')?.value   || '';
+  const filtPed      = document.getElementById('filtPed')?.checked  !== false;
+  const filtReq      = document.getElementById('filtReq')?.checked  !== false;
+
+  if (!filtPed && !filtReq) { toast('Selecciona al menos un tipo de documento', 'wa'); return; }
+
+  // Guardar filtros activos globalmente
+  window._alFiltros = { zonaLog: filtZonaLog, zonaPick: filtZonaPick, bodega: filtBodega, ped: filtPed, req: filtReq };
+
+  // Filtrar items
+  let items = _alItems;
+  if (filtZonaLog)  items = items.filter(i => (i.zona_logistica||'') === filtZonaLog);
+  if (filtZonaPick) items = items.filter(i => (i._zona||'SIN ZONA') === filtZonaPick);
+  if (filtBodega)   items = items.filter(i => i.bodega === filtBodega);
+  if (!filtPed)     items = items.filter(i => i._tipo !== 'pedidos');
+  if (!filtReq)     items = items.filter(i => i._tipo !== 'requisiciones');
+
+  if (!items.length) { toast('No hay ítems con los filtros seleccionados', 'wa'); return; }
+
+  // Guardar items filtrados para el picking
+  window._alItemsFiltrados = items;
+  pgMostrarZonas(items);
+}
+
+// ── Pantalla: lista de zonas filtradas ───────────────────────────
+function pgMostrarZonas(items) {
+  $fab.style.display = 'none';
+  const f = window._alFiltros || {};
+
+  const total = items.length;
+  const compl = items.filter(i => i.estado_prep === 'completo').length;
+  const parc  = items.filter(i => i.estado_prep === 'parcial').length;
+  const pct   = total ? Math.round((compl+parc)/total*100) : 0;
+
+  // Agrupar por zona ordenado por secuencia
   const zonas = {};
-  _alItems.forEach(i => {
+  items.forEach(i => {
     const z = i._zona || 'SIN ZONA';
-    if (!zonas[z]) zonas[z] = { total: 0, done: 0, seq: i._seq };
+    if (!zonas[z]) zonas[z] = { total: 0, done: 0, seq: i._seq || 9999 };
     zonas[z].total++;
     if (i.estado_prep === 'completo' || i.estado_prep === 'parcial') zonas[z].done++;
   });
-  const zonaList = Object.entries(zonas).sort((a, b) => a[1].seq - b[1].seq);
+  const zonaList = Object.entries(zonas).sort((a,b) => a[1].seq - b[1].seq);
 
-  let html = `<div class="hdr">
-    <button class="hdr-btn" onclick="pgSelectPerfil()">← Perfil</button>
-    <div style="flex:1"><div style="font-weight:700;font-size:15px">📋 Alistador — CO ${G.co.id}</div>
-    <div style="font-size:11px;opacity:.85">${G.co.nombre} · ${pct}% avance</div></div>
-    <button class="hdr-btn" onclick="abrirBuscador()" style="background:rgba(255,255,255,0.15)">🔍</button>
-    <button class="hdr-btn" onclick="cerrarSesion()" style="background:rgba(255,255,255,0.15)">🚪</button>
-  </div>
-  <div style="padding:8px 14px 0">
-    <div class="prog-bg" style="height:10px"><div class="prog-fill" style="width:${pct}%"></div></div>
-  </div>
-  <div class="stat-grid">
-    <div class="stat-box"><div class="stat-n" style="color:var(--ok)">${compl}</div><div class="stat-l">✅ Completos</div></div>
-    <div class="stat-box"><div class="stat-n" style="color:var(--wa)">${parc}</div><div class="stat-l">⏳ Parciales</div></div>
-    <div class="stat-box"><div class="stat-n" style="color:var(--mut)">${pend}</div><div class="stat-l">⬜ Pendientes</div></div>
-  </div>
-  <div style="padding:6px 14px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-    <span style="font-size:12px;font-weight:700;color:var(--mut);flex:1">ZONAS DE PICKING</span>
-    <select id="alFiltroZonaLog" style="padding:5px 8px;border:1px solid var(--bord);border-radius:8px;font-size:12px;outline:none;background:#fff" onchange="renderAlZonas()">
-      <option value="">Toda Z.Logística</option>
-      ${[...new Set(_alItems.map(i=>i.zona_logistica||'').filter(Boolean))].sort().map(z=>'<option>'+e(z)+'</option>').join('')}
-    </select>
-    <select id="alFiltroZona" style="padding:5px 8px;border:1px solid var(--bord);border-radius:8px;font-size:12px;outline:none;background:#fff" onchange="renderAlZonas()">
-      <option value="">Toda zona</option>
-      ${[...new Set(_alItems.map(i=>i._zona||'SIN ZONA'))].sort().map(z=>'<option>'+e(z)+'</option>').join('')}
-    </select>
-  </div>
-  <div id="alZonaList">`;
+  // Chips de filtros activos
+  const chips = [];
+  if (f.zonaLog)  chips.push('📍 ' + f.zonaLog);
+  if (f.zonaPick) chips.push('🗺 ' + f.zonaPick);
+  if (f.bodega)   chips.push('🏪 ' + f.bodega);
+  if (f.ped && !f.req)   chips.push('📦 Solo pedidos');
+  if (f.req && !f.ped)   chips.push('🔄 Solo requisiciones');
+  const chipsHtml = chips.length
+    ? '<div style="padding:4px 14px;display:flex;gap:6px;flex-wrap:wrap">'
+      + chips.map(ch => '<span class="badge b-gray" style="font-size:11px">' + e(ch) + '</span>').join('')
+      + '</div>'
+    : '';
 
-  // Zones go inside alZonaList div — close html before zones
-  html += '</div>'; // closes alZonaList
-  // We pre-populate it via renderAlZonas after render
+  let html = '<div class="hdr">'
+    + '<button class="hdr-btn" onclick="pgAlistadorHome()">← Filtros</button>'
+    + '<div style="flex:1"><div style="font-weight:700;font-size:15px">🗺 Zonas de picking</div>'
+    + '<div style="font-size:11px;opacity:.85">' + total + ' refs · ' + pct + '% avance</div></div>'
+    + '<button class="hdr-btn" onclick="abrirBuscador()" style="background:rgba(255,255,255,.15)">🔍</button>'
+    + '</div>'
+    + chipsHtml
+    + '<div style="padding:4px 14px 2px"><div class="prog-bg" style="height:8px">'
+    + '<div class="prog-fill" style="width:' + pct + '%"></div></div></div>';
 
   if (zonaList.length === 0) {
-    // Will show via renderAlZonas
+    html += '<div class="card" style="text-align:center;color:var(--mut)">Sin zonas para los filtros seleccionados.</div>';
   }
+
+  zonaList.forEach(([zona, info]) => {
+    const zPct   = info.total ? Math.round(info.done/info.total*100) : 0;
+    const allDone = info.done === info.total;
+    html += '<div class="list-item" style="' + (allDone?'opacity:.6':'') + '" onclick="iniciarCadenaFiltrada(' + JSON.stringify(encodeURIComponent(zona)) + ')">'
+      + '<div class="li-icon">' + (allDone ? '✅' : '📦') + '</div>'
+      + '<div class="li-body">'
+      + '<div class="li-name">' + e(zona) + '</div>'
+      + '<div class="li-sub">' + info.total + ' referencias · ' + zPct + '%</div>'
+      + '<div class="prog-bg" style="height:4px;margin-top:4px"><div class="prog-fill" style="width:' + zPct + '%"></div></div>'
+      + '</div><div class="li-arr">›</div></div>';
+  });
+
   rdr(html);
-  // Initialize filters
-  window._alFiltroLog = ''; window._alFiltroZona = '';
-  renderAlZonas();
-  // Restore filters if they exist
-  if (window._alFiltroLog) { const s = document.getElementById('alFiltroZonaLog'); if(s) s.value = window._alFiltroLog; }
-  if (window._alFiltroZona) { const s = document.getElementById('alFiltroZona'); if(s) s.value = window._alFiltroZona; }
+}
+
+// Inicia cadena usando los items filtrados
+function iniciarCadenaFiltrada(zonaEnc) {
+  const zona = decodeURIComponent(zonaEnc);
+  _alZona = zona;
+  const items = (window._alItemsFiltrados || _alItems)
+    .filter(i => (i._zona || 'SIN ZONA') === zona)
+    .sort((a,b) => (a._seq||9999) - (b._seq||9999));
+  if (!items.length) { toast('Sin ítems en esta zona', 'wa'); return; }
+  _chainItems = items;
+  if (_chainItems.every(i => i.estado_prep === 'completo')) {
+    toast('✅ Zona ya completada', 'ok');
+    return;
+  }
+  const first = _chainItems.findIndex(i => i.estado_prep !== 'completo');
+  pgPickingItem(first >= 0 ? first : 0);
 }
 
 function renderAlZonas() {
@@ -1834,7 +1982,7 @@ function pgZonaItems(zonaEnc) {
     <div id="zonaTimerDisplay" class="timer-box">⏱ 0 min</div>
   </div>
   <div style="padding:4px 14px 2px;display:flex;gap:6px;background:var(--surf);border-bottom:1px solid var(--bord)">
-    <button class="btn btn-sm" style="background:var(--gold);color:var(--pr);flex:2;font-weight:700" onclick="iniciarCadena('${encodeURIComponent(zona)}')">▶ Iniciar picking</button>
+    <button class="btn btn-sm" style="background:var(--gold);color:var(--pr);flex:2;font-weight:700" onclick="iniciarCadenaFiltrada('${encodeURIComponent(zona)}')">▶ Iniciar picking</button>
     <button class="btn btn-sm" style="background:var(--pr);color:var(--gold)" onclick="imprimirZona('${e(zona)}')">🖨️</button>
     <button class="btn btn-sm" style="background:var(--pr);color:var(--gold)" onclick="abrirEscaner()">📷</button>
     ${G.perfil==='supervisor'||G.perfil==='admin'?`<button class="btn btn-sm" style="background:var(--pr);color:var(--gold)" onclick="abrirValidacionSupervisor('${encodeURIComponent(zona)}')">✅</button>`:''}
@@ -2276,26 +2424,93 @@ async function saveParcialConCantidad(gKeyEnc, cantConf) {
 }
 
 
+
+// ── UM display helpers ───────────────────────────────────────────
+function umDesglose(cant, um) {
+  const f = factorUM(um);
+  if (f <= 1 || !cant) return '';
+  const cajas   = Math.floor(cant / f);
+  const sueltas = Math.round((cant % f) * 100) / 100;
+  let txt = '';
+  if (cajas > 0)   txt += '<strong>' + fmtn(cajas) + '</strong> caja' + (cajas !== 1 ? 's' : '');
+  if (cajas > 0 && sueltas > 0) txt += ' + ';
+  if (sueltas > 0) txt += '<strong>' + fmtn(sueltas) + '</strong> und sueltas';
+  return '<div style="font-size:13px;color:var(--mut);margin-top:4px">' + txt + '</div>';
+}
+
+function buildCantInputs(cantTotal, um) {
+  const f = factorUM(um);
+  const { cajas, sueltas } = aCajasYSueltas(cantTotal, um);
+
+  if (f <= 1) {
+    // Sin empaque: campo único en unidades
+    return '<div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:4px">📦 CANTIDAD ALISTADA (unidades)</div>'
+      + '<input id="cantConfirm" class="scan-inp" type="number" min="0" max="' + cantTotal + '"'
+      + ' value="' + cantTotal + '" style="font-size:26px;font-weight:900;text-align:center"'
+      + ' data-factor="1" data-max="' + cantTotal + '" />';
+  }
+
+  // Con empaque: dos campos — cajas y sueltas
+  return '<div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:6px">📦 CANTIDAD ALISTADA</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    + '<div>'
+    + '<div style="font-size:11px;text-align:center;color:var(--mut);margin-bottom:3px">Cajas (' + e(um) + ')</div>'
+    + '<input id="cantCajas" class="scan-inp" type="number" min="0" max="' + cajas + '"'
+    + ' value="' + cajas + '" style="font-size:22px;font-weight:900;text-align:center"'
+    + ' data-factor="' + f + '" data-max-cajas="' + cajas + '" data-max-total="' + cantTotal + '"'
+    + ' oninput="sincronizarCajas(this)" />'
+    + '</div>'
+    + '<div>'
+    + '<div style="font-size:11px;text-align:center;color:var(--mut);margin-bottom:3px">Und. sueltas</div>'
+    + '<input id="cantSueltas" class="scan-inp" type="number" min="0" max="' + (f-1) + '"'
+    + ' value="' + sueltas + '" style="font-size:22px;font-weight:900;text-align:center"'
+    + ' data-factor="' + f + '" data-max-total="' + cantTotal + '"'
+    + ' oninput="sincronizarSueltas(this)" />'
+    + '</div>'
+    + '</div>'
+    // Campo oculto que siempre tiene el total en unidades
+    + '<input type="hidden" id="cantConfirm" value="' + cantTotal + '" data-factor="' + f + '" data-max="' + cantTotal + '"/>'
+    + '<div id="cantResumen" style="font-size:12px;text-align:center;color:var(--mut);margin-top:6px">'
+    + 'Total: <strong>' + fmtn(cantTotal) + '</strong> unidades</div>';
+}
+
+function sincronizarCajas(inp) {
+  const f       = parseFloat(inp.dataset.factor) || 1;
+  const maxT    = parseFloat(inp.dataset.maxTotal) || 0;
+  const cajas   = Math.max(0, parseFloat(inp.value) || 0);
+  const sInp    = document.getElementById('cantSueltas');
+  const hidden  = document.getElementById('cantConfirm');
+  const resumen = document.getElementById('cantResumen');
+  const sueltas = Math.max(0, parseFloat(sInp?.value) || 0);
+  const total   = cajas * f + sueltas;
+  if (hidden)  hidden.value = total;
+  if (resumen) resumen.innerHTML = 'Total: <strong>' + fmtn(total) + '</strong> unidades'
+    + (total > maxT ? ' <span style="color:var(--er)">⚠️ excede ' + fmtn(maxT) + '</span>' : '');
+  pickingValidarCant();
+}
+
+function sincronizarSueltas(inp) {
+  const f       = parseFloat(inp.dataset.factor) || 1;
+  const maxT    = parseFloat(inp.dataset.maxTotal) || 0;
+  const sueltas = Math.max(0, parseFloat(inp.value) || 0);
+  const cInp    = document.getElementById('cantCajas');
+  const hidden  = document.getElementById('cantConfirm');
+  const resumen = document.getElementById('cantResumen');
+  const cajas   = Math.max(0, parseFloat(cInp?.value) || 0);
+  const total   = cajas * f + sueltas;
+  if (hidden)  hidden.value = total;
+  if (resumen) resumen.innerHTML = 'Total: <strong>' + fmtn(total) + '</strong> unidades'
+    + (total > maxT ? ' <span style="color:var(--er)">⚠️ excede ' + fmtn(maxT) + '</span>' : '');
+  pickingValidarCant();
+}
+
 // ═══════════════════════════════════════════════════════════════
 // FLUJO PICKING EN CADENA
 // ═══════════════════════════════════════════════════════════════
 
 function iniciarCadena(zonaEnc) {
-  const zona = decodeURIComponent(zonaEnc);
-  _alZona = zona;
-  // Ordenar por secuencia — pendientes primero, luego parciales
-  _chainItems = _alItems
-    .filter(i => (i._zona || 'SIN ZONA') === zona)
-    .sort((a, b) => (a._seq || 9999) - (b._seq || 9999));
-  // Buscar el primer pendiente
-  const firstPend = _chainItems.findIndex(i => i.estado_prep !== 'completo');
-  _chainIdx = firstPend >= 0 ? firstPend : 0;
-  if (_chainItems.length === 0) { toast('Sin ítems en esta zona', 'wa'); return; }
-  if (_chainItems.every(i => i.estado_prep === 'completo')) {
-    toast('✅ Todos los ítems ya están completos', 'ok');
-    return;
-  }
-  pgPickingItem(_chainIdx);
+  // Delegate to filtered version if filters are active
+  iniciarCadenaFiltrada(zonaEnc);
 }
 
 function pgPickingItem(idx) {
@@ -2303,29 +2518,31 @@ function pgPickingItem(idx) {
   const item = _chainItems[idx];
   if (!item) { pgZonaItems(encodeURIComponent(_alZona)); return; }
 
-  const total   = _chainItems.length;
-  const hechos  = _chainItems.filter(i => i.estado_prep === 'completo').length;
-  const pct     = total ? Math.round(hechos / total * 100) : 0;
-  const isDone  = item.estado_prep === 'completo';
-  const isParcial = item.estado_prep === 'parcial';
-  const kits    = _kitsMap[String(item.referencia)] || [];
+  const total    = _chainItems.length;
+  const hechos   = _chainItems.filter(i => i.estado_prep === 'completo').length;
+  const pct      = total ? Math.round(hechos / total * 100) : 0;
+  const isDone   = item.estado_prep === 'completo';
+  const isParcial= item.estado_prep === 'parcial';
+  const cantTotal= item.cant_total || item.cant_comprometida || 0;
+  const um       = e(String(item.um_emp || item.um || 'UND'));
+  const kits     = _kitsMap[String(item.referencia)] || [];
   const showKits = kits.length > 0 && item._desglosar;
-  const cantTotal = item.cant_total || item.cant_comprometida || 0;
-  const um = e(String(item.um_emp || item.um || 'UND'));
-  const tipoTag = item._tipo === 'pedidos' ?
-    '<span class="badge b-pr" style="font-size:10px">PED</span>' :
-    '<span class="badge b-vio" style="font-size:10px">REQ</span>';
-
-  // Navegación prev/next
-  const hasPrev = idx > 0;
-  const hasNext = idx < total - 1;
+  const hasPrev  = idx > 0;
+  const hasNext  = idx < total - 1;
   const nextPend = _chainItems.findIndex((it, i) => i > idx && it.estado_prep !== 'completo');
+  const tipoTag  = item._tipo === 'pedidos'
+    ? '<span class="badge b-pr" style="font-size:10px">PED</span>'
+    : '<span class="badge b-vio" style="font-size:10px">REQ</span>';
+
+  // Store in global so all handlers can access without passing args
+  window._pickingItem   = item;
+  window._pickingIdx    = idx;
+  window._pickingCanMax = cantTotal;
 
   // Kit breakdown
   let kitHtml = '';
   if (showKits) {
-    kitHtml = '<div class="kit-box" style="margin:8px 0">'
-      + '<div style="font-weight:700;color:var(--gold);margin-bottom:4px">🎁 Componentes:</div>';
+    kitHtml = '<div class="kit-box" style="margin:8px 0"><div style="font-weight:700;color:var(--gold);margin-bottom:4px">🎁 Componentes:</div>';
     kits.forEach(k => {
       kitHtml += '<div class="kit-row"><span>' + e(k.ref) + ' — ' + e(k.desc||'') + '</span>'
         + '<span style="font-weight:700">' + fmtn(k.qty * cantTotal) + ' ' + um + '</span></div>';
@@ -2333,350 +2550,299 @@ function pgPickingItem(idx) {
     kitHtml += '</div>';
   }
 
-  // Estado visual del ítem actual
   const estadoBadge = isDone
     ? '<span class="badge b-ok" style="font-size:13px">✅ Completo</span>'
     : isParcial
     ? '<span class="badge b-wa" style="font-size:13px">⏳ Parcial: ' + fmtn(item.cant_alistada_total||0) + ' ' + um + '</span>'
     : '';
 
-  const gKeyEnc = encodeURIComponent(item.referencia + '|' + item.bodega + '|' + item._tipo);
+  // ── Build HTML ───────────────────────────────────────────────
+  let html = '';
 
-  rdr('<div class="hdr">'
+  // Header
+  html += '<div class="hdr">'
     + '<button class="hdr-btn" onclick="pgZonaItems(encodeURIComponent(_alZona))">← Lista</button>'
     + '<div style="flex:1;text-align:center">'
-    + '<div style="font-size:11px;opacity:.8">' + e(_alZona) + ' · ' + (idx+1) + '/' + total + '</div>'
+    + '<div style="font-size:11px;opacity:.8">' + e(_alZona) + ' &nbsp;·&nbsp; ' + (idx+1) + '/' + total + '</div>'
     + '<div style="font-size:11px;opacity:.7">' + pct + '% completado</div>'
     + '</div>'
     + '<div id="zonaTimerDisplay" class="timer-box">⏱ 0 min</div>'
-    + '</div>'
+    + '</div>';
 
-    // Progress bar
-    + '<div style="padding:4px 14px 0">'
-    + '<div class="prog-bg" style="height:6px"><div class="prog-fill" style="width:' + pct + '%"></div></div>'
-    + '</div>'
+  // Progress
+  html += '<div style="padding:4px 14px 0"><div class="prog-bg" style="height:6px">'
+    + '<div class="prog-fill" style="width:' + pct + '%"></div></div></div>';
 
-    // Ítem principal
-    + '<div class="confirm-step">'
-    + '<div class="confirm-seq">SECUENCIA ' + (item._seq || '—') + ' &nbsp;·&nbsp; ' + e(item.bodega||'') + ' &nbsp;' + tipoTag + '</div>'
+  // Item card
+  html += '<div class="confirm-step">'
+    + '<div class="confirm-seq">SEC. ' + (item._seq || '—') + ' &nbsp;·&nbsp; ' + e(item.bodega||'') + ' &nbsp;' + tipoTag + '</div>'
     + '<div class="confirm-ref">' + e(String(item.referencia)) + '</div>'
     + '<div class="confirm-desc">' + e(String(item.desc_item||'—')) + '</div>'
     + kitHtml
     + '<div style="text-align:center;margin:10px 0">'
     + '<div style="font-size:11px;color:var(--mut);margin-bottom:2px">CANTIDAD A PREPARAR</div>'
-    + '<div class="confirm-cant">' + fmtn(cantTotal) + '</div>'
-    + '<div style="font-size:13px;color:var(--mut);margin-top:2px">' + um + '</div>'
+    + '<div class="confirm-cant">' + fmtn(cantTotal) + ' <span style="font-size:20px">' + e(item.um_emp||item.um||'UND') + '</span></div>'
+    + umDesglose(cantTotal, item.um_emp||item.um||'')
     + '</div>'
     + (estadoBadge ? '<div style="text-align:center;margin-bottom:8px">' + estadoBadge + '</div>' : '')
-    + '</div>'
+    + '</div>';
 
-    // Sección de confirmación por referencia
-    + (isDone ? '' :
-      '<div style="padding:0 14px">'
+  // Confirmation inputs (only when not done)
+  if (!isDone) {
+    html += '<div style="padding:0 14px">'
       + '<div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:4px">🔍 CONFIRMAR REFERENCIA</div>'
-      + '<input id="scanRef" class="scan-inp" type="text" placeholder="Escanea o escribe la referencia..." autocomplete="off" autocorrect="off" spellcheck="false"'
-      + ' data-ref="' + e(String(item.referencia)) + '" data-max="' + cantTotal + '" data-gkey="' + gKeyEnc + '" data-idx="' + idx + '"'
-      + ' oninput="validarRefInputDA(this)" onkeydown="handlePickingKeyDA(event,this)" />'
+      + '<input id="scanRef" class="scan-inp" type="text"'
+      + ' placeholder="Escanea o escribe la referencia..."'
+      + ' autocomplete="off" autocorrect="off" spellcheck="false" />'
+      + '<div id="refFeedback" style="font-size:12px;text-align:center;height:18px;margin-top:2px"></div>'
       + '</div>'
       + '<div id="cantSeccion" style="display:none;padding:0 14px;margin-top:6px">'
-      + '<div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:4px">📦 CANTIDAD ALISTADA</div>'
-      + '<input id="cantConfirm" class="scan-inp" type="number" min="0" max="' + cantTotal + '"'
-      + ' value="' + cantTotal + '" style="font-size:26px;font-weight:900;text-align:center"'
-      + ' oninput="validarCantInput(this,' + cantTotal + ')"'
-      + ' data-max="' + cantTotal + '" data-gkey="' + gKeyEnc + '" data-idx="' + idx + '"'
-      + ' oninput="validarCantInputDA(this)" onkeydown="handleCantKeyDA(event,this)" />'
-      + '</div>'
-    )
+      + buildCantInputs(cantTotal, item.um_emp||item.um||'')
+      + '<div id="cantFeedback" style="font-size:12px;text-align:center;margin-top:4px;min-height:18px"></div>'
+      + '</div>';
+  }
 
-    // Botones de acción
-    + '<div class="chain-nav">'
-    + (hasPrev ? '<button class="btn btn-sec btn-sm" style="flex:1" onclick="pgPickingItem(' + (idx-1) + ')">← Anterior</button>' : '<div style="flex:1"></div>')
+  // Navigation buttons
+  html += '<div class="chain-nav">'
+    + (hasPrev
+      ? '<button class="btn btn-sec btn-sm" style="flex:1" onclick="pgPickingItem(' + (idx-1) + ')">← Ant.</button>'
+      : '<div style="flex:1"></div>')
     + (isDone
-        ? '<button class="btn btn-sm" style="flex:2;background:var(--ok);color:#fff" onclick="pgPickingItem(' + (nextPend >= 0 ? nextPend : idx+1) + ')">Siguiente →</button>'
-        : '<button class="btn btn-sm" style="flex:2;background:var(--gold);color:var(--pr);font-weight:700" data-gkey="' + gKeyEnc + '" data-max="' + cantTotal + '" data-idx="' + idx + '" onclick="confirmarDesdeCadenaDA(this)">✅ Confirmar</button>')
-    // Si ya está hecho — botón deshacer
-  );
+      ? '<button class="btn btn-sm" style="flex:2;background:var(--ok);color:#fff"'
+        + ' onclick="pgPickingItem(' + (nextPend >= 0 ? nextPend : idx+1) + ')">'
+        + (nextPend >= 0 ? 'Siguiente →' : '✅ Fin zona') + '</button>'
+      : '<button class="btn btn-sm" style="flex:2;background:var(--gold);color:var(--pr);font-weight:700"'
+        + ' id="btnConfirmar" onclick="pickingConfirmar()">✅ Confirmar</button>')
+    + (hasNext
+      ? '<button class="btn btn-sec btn-sm" style="flex:1" onclick="pgPickingItem(' + (idx+1) + ')">Sal. →</button>'
+      : '<div style="flex:1"></div>')
+    + '</div>';
 
-  // Auto-focus al input de referencia si el ítem está pendiente
+  // Undo button if done/parcial
+  if (isDone || isParcial) {
+    html += '<div style="padding:0 14px 10px">'
+      + '<button class="btn btn-sec" onclick="pickingDeshacer()">↩ Deshacer</button>'
+      + '</div>';
+  }
+
+  rdr(html);
+
+  // Attach event listeners AFTER render (no inline handlers needed)
   if (!isDone) {
-    setTimeout(() => { document.getElementById('scanRef')?.focus(); }, 150);
+    const refInp  = document.getElementById('scanRef');
+    const cantInp = document.getElementById('cantConfirm');
+
+    refInp.addEventListener('input', () => pickingValidarRef());
+    refInp.addEventListener('keydown', pickingRefKeydown);
+
+    // Attach to all quantity inputs (single OR cajas+sueltas)
+    const cantInputs = [
+      document.getElementById('cantConfirm'),
+      document.getElementById('cantCajas'),
+      document.getElementById('cantSueltas'),
+    ].filter(Boolean);
+    cantInputs.forEach(inp => {
+      if (inp.type !== 'hidden') {
+        inp.addEventListener('input', () => pickingValidarCant());
+        inp.addEventListener('keydown', pickingCantKeydown);
+      }
+    });
+
+    setTimeout(() => { refInp.focus(); }, 150);
   }
 }
 
+// ── Helpers: acceder al item actual ─────────────────────────────
+function _pi()   { return window._pickingItem; }
+function _piMax(){ return window._pickingCanMax || 0; }
+function _piIdx(){ return window._pickingIdx || 0; }
 
-// ── Data-attribute wrappers (avoid inline arg escaping issues) ─
-function validarRefInputDA(inp) {
-  const ref = inp.dataset.ref || '';
-  const max = parseFloat(inp.dataset.max) || 0;
-  const gk  = inp.dataset.gkey || '';
-  validarRefInput(inp, ref, max, gk);
-}
-function validarCantInputDA(inp) {
-  validarCantInput(inp, parseFloat(inp.dataset.max) || 0);
-}
-function handlePickingKeyDA(event, inp) {
-  const gk  = inp.dataset.gkey || '';
-  const max = parseFloat(inp.dataset.max) || 0;
-  const idx = parseInt(inp.dataset.idx) || 0;
-  handlePickingKey(event, gk, max, idx);
-}
-function handleCantKeyDA(event, inp) {
-  const gk  = inp.dataset.gkey || '';
-  const max = parseFloat(inp.dataset.max) || 0;
-  const idx = parseInt(inp.dataset.idx) || 0;
-  handleCantKey(event, gk, max, idx);
-      + ' oninput="validarCantInputDA(this)" onkeydown="handleCantKeyDA(event,this)" />'
-function confirmarDesdeCadenaDA(btn) {
-  const gk  = btn.dataset.gkey || '';
-  const max = parseFloat(btn.dataset.max) || 0;
-  const idx = parseInt(btn.dataset.idx) || 0;
-  confirmarDesdeCadena(gk, max, idx);
-}
-
-// ── Validar referencia ingresada ─────────────────────────────
-function validarRefInput(inp, refEsperada, cantMax, gKeyEnc) {
-  const val = inp.value.trim().toUpperCase();
-  const ref = refEsperada.trim().toUpperCase();
+// ── Validar referencia ───────────────────────────────────────────
+function pickingValidarRef() {
+  const inp = document.getElementById('scanRef');
   const fb  = document.getElementById('refFeedback');
   const sec = document.getElementById('cantSeccion');
+  if (!inp) return;
+  const val = inp.value.trim().toUpperCase();
+  const ref = String(_pi()?.referencia || '').trim().toUpperCase();
   if (!val) {
     inp.className = 'scan-inp';
-    if (fb)  fb.textContent = '';
-    if (sec) sec.style.display = 'none';
+    fb.textContent = '';
+    sec.style.display = 'none';
     return;
   }
   if (val === ref) {
     inp.className = 'scan-inp ok';
-    if (fb)  fb.innerHTML = '<span style="color:var(--ok);font-weight:700">✅ Referencia correcta</span>';
-    if (sec) { sec.style.display = 'block'; setTimeout(() => { document.getElementById('cantConfirm')?.focus(); document.getElementById('cantConfirm')?.select(); }, 100); }
+    fb.innerHTML = '<span style="color:var(--ok);font-weight:700">✅ Referencia correcta</span>';
+    sec.style.display = 'block';
+    setTimeout(() => {
+      const c = document.getElementById('cantConfirm');
+      if (c) { c.focus(); c.select(); }
+    }, 100);
   } else if (ref.startsWith(val)) {
     inp.className = 'scan-inp';
-    if (fb)  fb.innerHTML = '<span style="color:var(--wa)">Sigue escribiendo...</span>';
-    if (sec) sec.style.display = 'none';
+    fb.innerHTML = '<span style="color:var(--wa)">Sigue escribiendo...</span>';
+    sec.style.display = 'none';
   } else {
     inp.className = 'scan-inp er';
-    if (fb)  fb.innerHTML = '<span style="color:var(--er);font-weight:700">❌ Referencia incorrecta</span>';
-    if (sec) sec.style.display = 'none';
+    fb.innerHTML = '<span style="color:var(--er);font-weight:700">❌ Referencia incorrecta</span>';
+    sec.style.display = 'none';
   }
 }
 
-// ── Validar cantidad ingresada ────────────────────────────────
-function validarCantInput(inp, cantMax) {
-  const val = parseFloat(inp.value) || 0;
-  const fb  = document.getElementById('cantFeedback');
-  if (val > cantMax) {
-    inp.className = 'scan-inp er';
-    if (fb) fb.innerHTML = '<span style="color:var(--er);font-weight:700">❌ No puedes confirmar más de ' + fmtn(cantMax) + '</span>';
-  } else if (val === cantMax) {
-    inp.className = 'scan-inp ok';
-    if (fb) fb.innerHTML = '<span style="color:var(--ok);font-weight:700">✅ Cantidad completa</span>';
+// ── Validar cantidad ─────────────────────────────────────────────
+function pickingValidarCant() {
+  const hidden = document.getElementById('cantConfirm');
+  const fb     = document.getElementById('cantFeedback');
+  if (!hidden) return;
+  const val = parseFloat(hidden.value) || 0;
+  const max = _piMax();
+  const item = _pi();
+  const um   = item?.um_emp || item?.um || '';
+  const f    = factorUM(um);
+  // Update visual on single input if present
+  const singleInp = document.getElementById('cantConfirm');
+  if (singleInp && singleInp.type === 'number') {
+    singleInp.className = val > max ? 'scan-inp er' : val === max ? 'scan-inp ok' : val > 0 ? 'scan-inp' : 'scan-inp';
+  }
+  if (!fb) return;
+  if (val > max) {
+    fb.innerHTML = '<span style="color:var(--er);font-weight:700">❌ Máximo: ' + fmtCantUM(max,um) + '</span>';
+  } else if (val === max) {
+    fb.innerHTML = '<span style="color:var(--ok);font-weight:700">✅ Cantidad completa</span>';
   } else if (val > 0) {
-    inp.className = 'scan-inp';
-    if (fb) fb.innerHTML = '<span style="color:var(--wa)">⚠️ Cantidad parcial: ' + fmtn(cantMax - val) + ' faltantes</span>';
+    const falt = max - val;
+    fb.innerHTML = '<span style="color:var(--wa)">⚠️ Parcial — faltan ' + fmtCantUM(falt,um) + '</span>';
   } else {
-    inp.className = 'scan-inp';
-    if (fb) fb.textContent = '';
+    fb.textContent = '';
   }
 }
 
-// ── Teclado: Enter/Escape en input de referencia ─────────────
-function handlePickingKey(event, gKeyEnc, cantMax, idx) {
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    pgZonaItems(encodeURIComponent(_alZona));
-  }
+// ── Teclados ─────────────────────────────────────────────────────
+function pickingRefKeydown(event) {
+  const sec = document.getElementById('cantSeccion');
+  if (event.key === 'Escape') { event.preventDefault(); pgZonaItems(encodeURIComponent(_alZona)); }
   if (event.key === 'Enter') {
     event.preventDefault();
-    const inp = document.getElementById('scanRef');
-    const sec = document.getElementById('cantSeccion');
     if (sec && sec.style.display !== 'none') {
-      // Ya verificada la ref — avanzar al campo cantidad
-      document.getElementById('cantConfirm')?.focus();
-      document.getElementById('cantConfirm')?.select();
-    } else if (inp && inp.className.includes('ok')) {
-      // Confirmar directo si ref OK
-      document.getElementById('cantConfirm')?.focus();
+      const c = document.getElementById('cantConfirm');
+      if (c) { c.focus(); c.select(); }
+    } else {
+      // Try to validate first
+      pickingValidarRef();
+      setTimeout(() => {
+        const sec2 = document.getElementById('cantSeccion');
+        if (sec2 && sec2.style.display !== 'none') {
+          const c = document.getElementById('cantConfirm');
+          if (c) { c.focus(); c.select(); }
+        }
+      }, 50);
     }
   }
 }
 
-// ── Teclado: Enter/Escape en input de cantidad ───────────────
-function handleCantKey(event, gKeyEnc, cantMax, idx) {
-      + ' oninput="validarCantInputDA(this)" onkeydown="handleCantKeyDA(event,this)" />'
+function pickingCantKeydown(event) {
+  if (event.key === 'Escape') {
     event.preventDefault();
-    document.getElementById('cantSeccion').style.display = 'none';
-    document.getElementById('scanRef').value = '';
-    document.getElementById('scanRef').className = 'scan-inp';
-    document.getElementById('refFeedback').textContent = '';
-    document.getElementById('scanRef')?.focus();
+    const sec = document.getElementById('cantSeccion');
+    const ref = document.getElementById('scanRef');
+    if (sec) sec.style.display = 'none';
+    if (ref) { ref.value = ''; ref.className = 'scan-inp'; ref.focus(); }
+    const fb = document.getElementById('refFeedback');
+    if (fb) fb.textContent = '';
   }
   if (event.key === 'Enter') {
     event.preventDefault();
-    confirmarDesdeCadena(gKeyEnc, cantMax, idx);
+    // Si hay campo sueltas y el foco está en cajas, saltar a sueltas
+    const sueltas = document.getElementById('cantSueltas');
+    if (sueltas && event.target.id === 'cantCajas') {
+      sueltas.focus(); sueltas.select(); return;
+    }
+    pickingConfirmar();
   }
 }
 
-// ── Confirmar desde cadena (valida ref + cantidad) ───────────
-function confirmarDesdeCadena(gKeyEnc, cantMax, idx) {
+// ── Confirmar ítem ───────────────────────────────────────────────
+function pickingConfirmar() {
   const refInp  = document.getElementById('scanRef');
   const cantInp = document.getElementById('cantConfirm');
   const sec     = document.getElementById('cantSeccion');
-  const item    = _chainItems[idx];
+  const item    = _pi();
   if (!item) return;
 
-  // Si la sección de cantidad no está visible → primero verificar referencia
-  if (!sec || sec.style.display === 'none') {
-    toast('Primero confirma la referencia escaneando o escribiéndola', 'wa');
-    refInp?.focus();
-    return;
-  }
-  const refVal  = (refInp?.value || '').trim().toUpperCase();
-  const refEsp  = String(item.referencia).trim().toUpperCase();
+  // 1. Verificar referencia
+  const refVal = (refInp?.value || '').trim().toUpperCase();
+  const refEsp = String(item.referencia).trim().toUpperCase();
   if (refVal !== refEsp) {
-    toast('❌ La referencia no coincide', 'er');
+    toast('Escribe o escanea la referencia primero', 'wa');
     refInp?.focus();
     return;
   }
-  const cantVal = parseFloat(cantInp?.value) || 0;
-  if (cantVal > cantMax) {
-    toast('❌ No puedes confirmar más de ' + fmtn(cantMax), 'er');
-    cantInp?.focus();
+  // 2. Verificar que cantSeccion está visible
+  if (!sec || sec.style.display === 'none') {
+    toast('Confirma la referencia primero', 'wa');
     return;
   }
-  if (cantVal < 0) { toast('Cantidad inválida', 'er'); return; }
+  // 3. Leer cantidad
+  const cantVal = parseFloat(cantInp?.value) || 0;
+  const cantMax = _piMax();
+  if (cantVal > cantMax) { toast('❌ No puedes confirmar más de ' + fmtn(cantMax), 'er'); cantInp?.focus(); return; }
+  if (cantVal <= 0)       { toast('Ingresa una cantidad mayor a 0', 'wa'); cantInp?.focus(); return; }
 
-  if (cantVal === cantMax) {
-    // Completo
-    procesarConfirmacionCadena(gKeyEnc, cantMax, cantMax, idx);
-  } else if (cantVal === 0) {
-    toast('Ingresa una cantidad mayor a 0', 'wa');
-    cantInp?.focus();
+  if (cantVal >= cantMax) {
+    pickingGuardar('completo', cantMax, null);
   } else {
-    // Parcial — abrir modal de motivo
-    abrirMotivoModal(gKeyEnc, cantMax, cantVal, idx);
+    pickingAbrirMotivo(cantVal, cantMax);
   }
 }
 
-async function procesarConfirmacionCadena(gKeyEnc, cantMax, cantConf, idx) {
-  const gKey  = decodeURIComponent(gKeyEnc);
+// ── Guardar en BD ────────────────────────────────────────────────
+async function pickingGuardar(estado, cantConf, motivo) {
+  const item  = _pi();
+  const idx   = _piIdx();
+  const gKey  = item.referencia + '|' + item.bodega + '|' + item._tipo;
   const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
   if (!group) return;
   ld('Guardando...');
   try {
-    if (cantConf >= cantMax) {
-      // Completo
+    if (estado === 'completo') {
       for (const it of group._items) {
         await sb.from(it._tipo).update({ estado_prep:'completo', cant_alistada:it.cant_comprometida, motivo:null }).eq('id', it.id);
         Object.assign(it, { estado_prep:'completo', cant_alistada:it.cant_comprometida, motivo:null });
       }
-      group.estado_prep = 'completo'; group.cant_alistada_total = cantMax; group.motivo = null;
+      group.estado_prep = 'completo'; group.cant_alistada_total = group.cant_total; group.motivo = null;
+    } else {
+      let rem = cantConf;
+      for (let i = 0; i < group._items.length; i++) {
+        const it = group._items[i];
+        const isLast = i === group._items.length - 1;
+        const q = isLast ? rem : Math.min(rem, it.cant_comprometida || 0);
+        await sb.from(it._tipo).update({ estado_prep:'parcial', cant_alistada:q, motivo }).eq('id', it.id);
+        Object.assign(it, { estado_prep:'parcial', cant_alistada:q, motivo });
+        rem = Math.max(0, rem - q);
+      }
+      group.estado_prep = 'parcial'; group.cant_alistada_total = cantConf; group.motivo = motivo;
     }
+    // Sync _chainItems
+    const ci = _chainItems[idx];
+    if (ci) { ci.estado_prep = estado; ci.cant_alistada_total = cantConf; ci.motivo = motivo; }
     uld();
-    // Sincronizar en _chainItems
-    const ci = _chainItems[idx];
-    if (ci) { ci.estado_prep = 'completo'; ci.cant_alistada_total = cantMax; }
-    toast('✅ Preparado', 'ok');
-    // Auto-avanzar al siguiente pendiente
+    toast(estado === 'completo' ? '✅ Preparado' : '⏳ Parcial registrado', estado === 'completo' ? 'ok' : 'wa');
+    // Auto-avanzar
     const nextPend = _chainItems.findIndex((it, i) => i > idx && it.estado_prep !== 'completo');
     if (nextPend >= 0) {
-      setTimeout(() => pgPickingItem(nextPend), 400);
+      setTimeout(() => pgPickingItem(nextPend), 300);
     } else {
-      // Todos completos
-      setTimeout(() => {
-        toast('🎉 ¡Zona completada!', 'ok');
-        pgZonaItems(encodeURIComponent(_alZona));
-      }, 600);
+      setTimeout(() => { toast('🎉 ¡Zona completada!', 'ok'); pgZonaItems(encodeURIComponent(_alZona)); }, 500);
     }
   } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
 }
 
-function abrirMotivoModal(gKeyEnc, cantMax, cantConf, idx) {
-  const item = _chainItems[idx];
-  const um   = e(String(item?.um_emp || item?.um || 'UND'));
-  document.body.insertAdjacentHTML('beforeend',
-    '<div class="overlay" id="motivoModal" style="display:flex">'
-    + '<div class="modal">'
-    + '<div class="modal-hdl"></div>'
-    + '<div style="font-weight:700;font-size:15px;margin-bottom:8px">⚠️ Cantidad parcial</div>'
-    + '<div style="background:var(--wa-l);padding:10px;border-radius:8px;text-align:center;margin-bottom:12px">'
-    + 'Alistado: <strong style="font-size:18px">' + fmtn(cantConf) + '</strong> de <strong>' + fmtn(cantMax) + '</strong> ' + um
-    + '<br><span style="font-size:11px;color:var(--wa)">Faltante: ' + fmtn(cantMax - cantConf) + ' ' + um + '</span>'
-    + '</div>'
-    + '<span class="inp-label">Motivo (obligatorio)</span>'
-    + '<option value="">Selecciona motivo...</option>'
-    + '<option>Sin stock suficiente</option>'
-    + '<option>Producto dañado</option>'
-    + '<option>No ubicado</option>'
-    + '<option>Fecha vencida</option>'
-    + '<option>Error en cantidad pedida</option>'
-    + '<option>Producto en cuarentena</option>'
-    + '<option>Otro</option>'
-    + '</select>'
-    + '<input id="motivoNota" class="inp" placeholder="Nota adicional (opcional)" style="margin-top:6px"'
-    + ' onkeydown="handleMotivoKey(event)"'
-    + ' />'
-    + '<div style="display:flex;gap:8px;margin-top:12px">'
-    + '<button class="btn btn-sec" style="flex:1" onclick="cerrarMotivoModal()">Cancelar</button>'
-    + '<button class="btn btn-sec" style="flex:1" onclick="cerrarMotivoModal()">Cancelar</button>'
-    + '</div></div></div>'
-  );
-  setTimeout(() => document.getElementById('motivoSel')?.focus(), 150);
-}
-
-function cerrarMotivoModal() { document.getElementById('motivoModal')?.remove(); }
-function handleMotivoKey(event) {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    guardarMotivoCadenaDA(document.getElementById('motivoSel'));
-  }
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    document.getElementById('motivoModal')?.remove();
-  }
-}
-function guardarMotivoCadenaDA(el) {
-  const gk  = el.dataset.gkey  || document.getElementById('motivoSel')?.dataset.gkey || '';
-  const max = parseFloat(el.dataset.max  || document.getElementById('motivoSel')?.dataset.max  || 0);
-  const conf= parseFloat(el.dataset.conf || document.getElementById('motivoSel')?.dataset.conf || 0);
-  const idx = parseInt(el.dataset.idx   || document.getElementById('motivoSel')?.dataset.idx   || 0);
-  guardarMotivoCadena(gk, max, conf, idx);
-}
-async function guardarMotivoCadena(gKeyEnc, cantMax, cantConf, idx) {
-  const motivo = document.getElementById('motivoSel')?.value;
-  const nota   = document.getElementById('motivoNota')?.value;
-  if (!motivo) { toast('Selecciona un motivo', 'wa'); return; }
-  document.getElementById('motivoModal')?.remove();
-  const gKey  = decodeURIComponent(gKeyEnc);
-  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
-  if (!group) return;
-  const m = motivo + (nota ? ': ' + nota : '');
-  ld('Guardando parcial...');
-  try {
-    let remaining = cantConf;
-    for (let i = 0; i < group._items.length; i++) {
-      const it = group._items[i];
-      const isLast = i === group._items.length - 1;
-      const itQty = isLast ? remaining : Math.min(remaining, it.cant_comprometida || 0);
-      await sb.from(it._tipo).update({ estado_prep:'parcial', cant_alistada:itQty, motivo:m }).eq('id', it.id);
-      Object.assign(it, { estado_prep:'parcial', cant_alistada:itQty, motivo:m });
-      remaining = Math.max(0, remaining - itQty);
-    }
-    group.estado_prep = 'parcial'; group.cant_alistada_total = cantConf; group.motivo = m;
-    const ci = _chainItems[idx];
-    if (ci) { ci.estado_prep = 'parcial'; ci.cant_alistada_total = cantConf; ci.motivo = m; }
-    uld(); toast('⏳ Parcial registrado', 'wa');
-    const nextPend = _chainItems.findIndex((it, i) => i > idx && it.estado_prep !== 'completo');
-    if (nextPend >= 0) {
-      setTimeout(() => pgPickingItem(nextPend), 400);
-    } else {
-      setTimeout(() => pgZonaItems(encodeURIComponent(_alZona)), 600);
-    }
-  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
-}
-
-function deshacerCadenaDA(btn) { deshacerCadena(btn.dataset.gkey, parseInt(btn.dataset.idx)); }
-async function deshacerCadena(gKeyEnc, idx) {
-  const gKey  = decodeURIComponent(gKeyEnc);
+// ── Deshacer ─────────────────────────────────────────────────────
+async function pickingDeshacer() {
+  const item  = _pi();
+  const idx   = _piIdx();
+  const gKey  = item.referencia + '|' + item.bodega + '|' + item._tipo;
   const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
   if (!group) return;
   ld('Deshaciendo...');
@@ -2692,6 +2858,65 @@ async function deshacerCadena(gKeyEnc, idx) {
     pgPickingItem(idx);
   } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
 }
+
+// ── Modal motivo (cantidad parcial) ──────────────────────────────
+function pickingAbrirMotivo(cantConf, cantMax) {
+  const item = _pi();
+  const um   = e(String(item?.um_emp || item?.um || 'UND'));
+  const modal = document.createElement('div');
+  modal.id = 'motivoModal';
+  modal.className = 'overlay';
+  modal.style.display = 'flex';
+  modal.innerHTML = '<div class="modal">'
+    + '<div class="modal-hdl"></div>'
+    + '<div style="font-weight:700;font-size:15px;margin-bottom:8px">⚠️ Cantidad parcial</div>'
+    + '<div style="background:var(--wa-l);padding:10px;border-radius:8px;text-align:center;margin-bottom:12px">'
+    + 'Alistado: <strong style="font-size:18px">' + fmtn(cantConf) + '</strong> de <strong>' + fmtn(cantMax) + '</strong> ' + um
+    + '<br><span style="font-size:11px;color:var(--wa)">Faltante: ' + fmtn(cantMax - cantConf) + ' ' + um + '</span>'
+    + '</div>'
+    + '<span class="inp-label">Motivo (obligatorio)</span>'
+    + '<select id="motivoSel" class="inp">'
+    + '<option value="">Selecciona motivo...</option>'
+    + '<option>Sin stock suficiente</option>'
+    + '<option>Producto dañado</option>'
+    + '<option>No ubicado</option>'
+    + '<option>Fecha vencida</option>'
+    + '<option>Error en cantidad pedida</option>'
+    + '<option>Producto en cuarentena</option>'
+    + '<option>Otro</option>'
+    + '</select>'
+    + '<input id="motivoNota" class="inp" placeholder="Nota adicional (opcional)" style="margin-top:6px"/>'
+    + '<div style="display:flex;gap:8px;margin-top:12px">'
+    + '<button class="btn btn-sec" style="flex:1" id="btnCancelarMotivo">Cancelar</button>'
+    + '<button class="btn btn-wa" style="flex:1" id="btnGuardarMotivo">Guardar</button>'
+    + '</div></div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#btnCancelarMotivo').onclick = () => modal.remove();
+  modal.querySelector('#btnGuardarMotivo').onclick  = () => pickingGuardarMotivo(cantConf, cantMax);
+  modal.onclick = ev => { if (ev.target === modal) modal.remove(); };
+
+  const sel = modal.querySelector('#motivoSel');
+  sel.focus();
+  sel.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); pickingGuardarMotivo(cantConf, cantMax); }
+    if (ev.key === 'Escape') { ev.preventDefault(); modal.remove(); }
+  });
+  modal.querySelector('#motivoNota').addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); pickingGuardarMotivo(cantConf, cantMax); }
+    if (ev.key === 'Escape') { ev.preventDefault(); modal.remove(); }
+  });
+}
+
+function pickingGuardarMotivo(cantConf, cantMax) {
+  const motivo = document.getElementById('motivoSel')?.value;
+  const nota   = document.getElementById('motivoNota')?.value || '';
+  if (!motivo) { toast('Selecciona un motivo', 'wa'); return; }
+  document.getElementById('motivoModal')?.remove();
+  const m = motivo + (nota ? ': ' + nota : '');
+  pickingGuardar('parcial', cantConf, m);
+}
+
 
 // ═══════════════════════════════════════════════════════════════
 // TECLADO GLOBAL: Enter y Escape para navegación
