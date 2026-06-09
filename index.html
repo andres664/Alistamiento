@@ -140,6 +140,17 @@ input:checked+.tog-sl:before{transform:translateX(18px)}
 .live-zona{font-size:11px;color:var(--mut)}
 /* Timer */
 .timer-box{background:var(--pr);color:var(--gold);padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+/* Confirmación flujo cadena */
+.confirm-step{background:var(--surf);border:3px solid var(--gold);border-radius:16px;padding:18px;margin:10px 14px}
+.confirm-seq{font-size:11px;font-weight:700;color:var(--mut);letter-spacing:1px;margin-bottom:6px}
+.confirm-ref{font-size:22px;font-weight:900;color:var(--pr);font-family:monospace;letter-spacing:2px}
+.confirm-desc{font-size:13px;color:var(--mut);margin:2px 0 10px}
+.confirm-cant{font-size:48px;font-weight:900;color:var(--gold);text-align:center;line-height:1}
+.scan-inp{width:100%;padding:12px 14px;border:2px solid var(--bord);border-radius:10px;font-size:18px;font-family:monospace;text-align:center;letter-spacing:2px;outline:none;transition:border-color .15s;margin:8px 0}
+.scan-inp:focus{border-color:var(--gold)}
+.scan-inp.ok{border-color:var(--ok);background:var(--ok-l)}
+.scan-inp.er{border-color:var(--er);background:var(--er-l)}
+.chain-nav{display:flex;gap:8px;padding:8px 14px;background:var(--surf);border-top:1px solid var(--bord);position:sticky;bottom:0}
 /* Historial */
 .hist-item{background:var(--surf);border-radius:12px;padding:12px 14px;margin:6px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .hist-date{font-size:11px;color:var(--mut)}
@@ -1640,6 +1651,8 @@ let _alItems = [];     // items del picking actual
 let _alZona  = null;   // zona activa
 let _alTipo  = null;   // 'pedidos' | 'requisiciones'
 let _kitsMap = {};
+let _chainIdx = 0;     // índice del ítem actual en el flujo cadena
+let _chainItems = [];  // lista ordenada de ítems pendientes de la zona activa
 
 async function pgAlistador() {
   ld('Cargando...');
@@ -1811,7 +1824,7 @@ function pgZonaItems(zonaEnc) {
     .sort((a, b) => a._seq - b._seq);
   const done = zItems.filter(i => i.estado_prep === 'completo' || i.estado_prep === 'parcial').length;
   const pct  = zItems.length ? Math.round(done / zItems.length * 100) : 0;
-  $fab.style.display = 'flex';
+  $fab.style.display = 'none';
 
   iniciarTimerZona(zona);
   let html = `<div class="hdr">
@@ -1821,9 +1834,10 @@ function pgZonaItems(zonaEnc) {
     <div id="zonaTimerDisplay" class="timer-box">⏱ 0 min</div>
   </div>
   <div style="padding:4px 14px 2px;display:flex;gap:6px;background:var(--surf);border-bottom:1px solid var(--bord)">
-    <button class="btn btn-sm" style="background:var(--pr);color:var(--gold);flex:1" onclick="imprimirZona('${e(zona)}')">🖨️ Imprimir</button>
-    <button class="btn btn-sm" style="background:var(--pr);color:var(--gold);flex:1" onclick="abrirEscaner()">📷 Escanear</button>
-    ${G.perfil==='supervisor'||G.perfil==='admin'?`<button class="btn btn-sm" style="background:var(--gold);color:var(--pr);flex:1" onclick="abrirValidacionSupervisor('${encodeURIComponent(zona)}')">✅ Validar</button>`:''}
+    <button class="btn btn-sm" style="background:var(--gold);color:var(--pr);flex:2;font-weight:700" onclick="iniciarCadena('${encodeURIComponent(zona)}')">▶ Iniciar picking</button>
+    <button class="btn btn-sm" style="background:var(--pr);color:var(--gold)" onclick="imprimirZona('${e(zona)}')">🖨️</button>
+    <button class="btn btn-sm" style="background:var(--pr);color:var(--gold)" onclick="abrirEscaner()">📷</button>
+    ${G.perfil==='supervisor'||G.perfil==='admin'?`<button class="btn btn-sm" style="background:var(--pr);color:var(--gold)" onclick="abrirValidacionSupervisor('${encodeURIComponent(zona)}')">✅</button>`:''}
   </div>
   <div style="padding:4px 14px 2px"><div class="prog-bg"><div class="prog-fill" style="width:${pct}%"></div></div></div>`;
 
@@ -2260,6 +2274,457 @@ async function saveParcialConCantidad(gKeyEnc, cantConf) {
     pgZonaItems(encodeURIComponent(_alZona));
   } catch(err) { uld(); toast('Error: '+err.message,'er'); }
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// FLUJO PICKING EN CADENA
+// ═══════════════════════════════════════════════════════════════
+
+function iniciarCadena(zonaEnc) {
+  const zona = decodeURIComponent(zonaEnc);
+  _alZona = zona;
+  // Ordenar por secuencia — pendientes primero, luego parciales
+  _chainItems = _alItems
+    .filter(i => (i._zona || 'SIN ZONA') === zona)
+    .sort((a, b) => (a._seq || 9999) - (b._seq || 9999));
+  // Buscar el primer pendiente
+  const firstPend = _chainItems.findIndex(i => i.estado_prep !== 'completo');
+  _chainIdx = firstPend >= 0 ? firstPend : 0;
+  if (_chainItems.length === 0) { toast('Sin ítems en esta zona', 'wa'); return; }
+  if (_chainItems.every(i => i.estado_prep === 'completo')) {
+    toast('✅ Todos los ítems ya están completos', 'ok');
+    return;
+  }
+  pgPickingItem(_chainIdx);
+}
+
+function pgPickingItem(idx) {
+  _chainIdx = idx;
+  const item = _chainItems[idx];
+  if (!item) { pgZonaItems(encodeURIComponent(_alZona)); return; }
+
+  const total   = _chainItems.length;
+  const hechos  = _chainItems.filter(i => i.estado_prep === 'completo').length;
+  const pct     = total ? Math.round(hechos / total * 100) : 0;
+  const isDone  = item.estado_prep === 'completo';
+  const isParcial = item.estado_prep === 'parcial';
+  const kits    = _kitsMap[String(item.referencia)] || [];
+  const showKits = kits.length > 0 && item._desglosar;
+  const cantTotal = item.cant_total || item.cant_comprometida || 0;
+  const um = e(String(item.um_emp || item.um || 'UND'));
+  const tipoTag = item._tipo === 'pedidos' ?
+    '<span class="badge b-pr" style="font-size:10px">PED</span>' :
+    '<span class="badge b-vio" style="font-size:10px">REQ</span>';
+
+  // Navegación prev/next
+  const hasPrev = idx > 0;
+  const hasNext = idx < total - 1;
+  const nextPend = _chainItems.findIndex((it, i) => i > idx && it.estado_prep !== 'completo');
+
+  // Kit breakdown
+  let kitHtml = '';
+  if (showKits) {
+    kitHtml = '<div class="kit-box" style="margin:8px 0">'
+      + '<div style="font-weight:700;color:var(--gold);margin-bottom:4px">🎁 Componentes:</div>';
+    kits.forEach(k => {
+      kitHtml += '<div class="kit-row"><span>' + e(k.ref) + ' — ' + e(k.desc||'') + '</span>'
+        + '<span style="font-weight:700">' + fmtn(k.qty * cantTotal) + ' ' + um + '</span></div>';
+    });
+    kitHtml += '</div>';
+  }
+
+  // Estado visual del ítem actual
+  const estadoBadge = isDone
+    ? '<span class="badge b-ok" style="font-size:13px">✅ Completo</span>'
+    : isParcial
+    ? '<span class="badge b-wa" style="font-size:13px">⏳ Parcial: ' + fmtn(item.cant_alistada_total||0) + ' ' + um + '</span>'
+    : '';
+
+  const gKeyEnc = encodeURIComponent(item.referencia + '|' + item.bodega + '|' + item._tipo);
+
+  rdr('<div class="hdr">'
+    + '<button class="hdr-btn" onclick="pgZonaItems(encodeURIComponent(_alZona))">← Lista</button>'
+    + '<div style="flex:1;text-align:center">'
+    + '<div style="font-size:11px;opacity:.8">' + e(_alZona) + ' · ' + (idx+1) + '/' + total + '</div>'
+    + '<div style="font-size:11px;opacity:.7">' + pct + '% completado</div>'
+    + '</div>'
+    + '<div id="zonaTimerDisplay" class="timer-box">⏱ 0 min</div>'
+    + '</div>'
+
+    // Progress bar
+    + '<div style="padding:4px 14px 0">'
+    + '<div class="prog-bg" style="height:6px"><div class="prog-fill" style="width:' + pct + '%"></div></div>'
+    + '</div>'
+
+    // Ítem principal
+    + '<div class="confirm-step">'
+    + '<div class="confirm-seq">SECUENCIA ' + (item._seq || '—') + ' &nbsp;·&nbsp; ' + e(item.bodega||'') + ' &nbsp;' + tipoTag + '</div>'
+    + '<div class="confirm-ref">' + e(String(item.referencia)) + '</div>'
+    + '<div class="confirm-desc">' + e(String(item.desc_item||'—')) + '</div>'
+    + kitHtml
+    + '<div style="text-align:center;margin:10px 0">'
+    + '<div style="font-size:11px;color:var(--mut);margin-bottom:2px">CANTIDAD A PREPARAR</div>'
+    + '<div class="confirm-cant">' + fmtn(cantTotal) + '</div>'
+    + '<div style="font-size:13px;color:var(--mut);margin-top:2px">' + um + '</div>'
+    + '</div>'
+    + (estadoBadge ? '<div style="text-align:center;margin-bottom:8px">' + estadoBadge + '</div>' : '')
+    + '</div>'
+
+    // Sección de confirmación por referencia
+    + (isDone ? '' :
+      '<div style="padding:0 14px">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:4px">🔍 CONFIRMAR REFERENCIA</div>'
+      + '<input id="scanRef" class="scan-inp" type="text" placeholder="Escanea o escribe la referencia..." autocomplete="off" autocorrect="off" spellcheck="false"'
+      + ' data-ref="' + e(String(item.referencia)) + '" data-max="' + cantTotal + '" data-gkey="' + gKeyEnc + '" data-idx="' + idx + '"'
+      + ' oninput="validarRefInputDA(this)" onkeydown="handlePickingKeyDA(event,this)" />'
+      + '</div>'
+      + '<div id="cantSeccion" style="display:none;padding:0 14px;margin-top:6px">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:4px">📦 CANTIDAD ALISTADA</div>'
+      + '<input id="cantConfirm" class="scan-inp" type="number" min="0" max="' + cantTotal + '"'
+      + ' value="' + cantTotal + '" style="font-size:26px;font-weight:900;text-align:center"'
+      + ' oninput="validarCantInput(this,' + cantTotal + ')"'
+      + ' data-max="' + cantTotal + '" data-gkey="' + gKeyEnc + '" data-idx="' + idx + '"'
+      + ' oninput="validarCantInputDA(this)" onkeydown="handleCantKeyDA(event,this)" />'
+      + '</div>'
+    )
+
+    // Botones de acción
+    + '<div class="chain-nav">'
+    + (hasPrev ? '<button class="btn btn-sec btn-sm" style="flex:1" onclick="pgPickingItem(' + (idx-1) + ')">← Anterior</button>' : '<div style="flex:1"></div>')
+    + (isDone
+        ? '<button class="btn btn-sm" style="flex:2;background:var(--ok);color:#fff" onclick="pgPickingItem(' + (nextPend >= 0 ? nextPend : idx+1) + ')">Siguiente →</button>'
+        : '<button class="btn btn-sm" style="flex:2;background:var(--gold);color:var(--pr);font-weight:700" data-gkey="' + gKeyEnc + '" data-max="' + cantTotal + '" data-idx="' + idx + '" onclick="confirmarDesdeCadenaDA(this)">✅ Confirmar</button>')
+    // Si ya está hecho — botón deshacer
+  );
+
+  // Auto-focus al input de referencia si el ítem está pendiente
+  if (!isDone) {
+    setTimeout(() => { document.getElementById('scanRef')?.focus(); }, 150);
+  }
+}
+
+
+// ── Data-attribute wrappers (avoid inline arg escaping issues) ─
+function validarRefInputDA(inp) {
+  const ref = inp.dataset.ref || '';
+  const max = parseFloat(inp.dataset.max) || 0;
+  const gk  = inp.dataset.gkey || '';
+  validarRefInput(inp, ref, max, gk);
+}
+function validarCantInputDA(inp) {
+  validarCantInput(inp, parseFloat(inp.dataset.max) || 0);
+}
+function handlePickingKeyDA(event, inp) {
+  const gk  = inp.dataset.gkey || '';
+  const max = parseFloat(inp.dataset.max) || 0;
+  const idx = parseInt(inp.dataset.idx) || 0;
+  handlePickingKey(event, gk, max, idx);
+}
+function handleCantKeyDA(event, inp) {
+  const gk  = inp.dataset.gkey || '';
+  const max = parseFloat(inp.dataset.max) || 0;
+  const idx = parseInt(inp.dataset.idx) || 0;
+  handleCantKey(event, gk, max, idx);
+      + ' oninput="validarCantInputDA(this)" onkeydown="handleCantKeyDA(event,this)" />'
+function confirmarDesdeCadenaDA(btn) {
+  const gk  = btn.dataset.gkey || '';
+  const max = parseFloat(btn.dataset.max) || 0;
+  const idx = parseInt(btn.dataset.idx) || 0;
+  confirmarDesdeCadena(gk, max, idx);
+}
+
+// ── Validar referencia ingresada ─────────────────────────────
+function validarRefInput(inp, refEsperada, cantMax, gKeyEnc) {
+  const val = inp.value.trim().toUpperCase();
+  const ref = refEsperada.trim().toUpperCase();
+  const fb  = document.getElementById('refFeedback');
+  const sec = document.getElementById('cantSeccion');
+  if (!val) {
+    inp.className = 'scan-inp';
+    if (fb)  fb.textContent = '';
+    if (sec) sec.style.display = 'none';
+    return;
+  }
+  if (val === ref) {
+    inp.className = 'scan-inp ok';
+    if (fb)  fb.innerHTML = '<span style="color:var(--ok);font-weight:700">✅ Referencia correcta</span>';
+    if (sec) { sec.style.display = 'block'; setTimeout(() => { document.getElementById('cantConfirm')?.focus(); document.getElementById('cantConfirm')?.select(); }, 100); }
+  } else if (ref.startsWith(val)) {
+    inp.className = 'scan-inp';
+    if (fb)  fb.innerHTML = '<span style="color:var(--wa)">Sigue escribiendo...</span>';
+    if (sec) sec.style.display = 'none';
+  } else {
+    inp.className = 'scan-inp er';
+    if (fb)  fb.innerHTML = '<span style="color:var(--er);font-weight:700">❌ Referencia incorrecta</span>';
+    if (sec) sec.style.display = 'none';
+  }
+}
+
+// ── Validar cantidad ingresada ────────────────────────────────
+function validarCantInput(inp, cantMax) {
+  const val = parseFloat(inp.value) || 0;
+  const fb  = document.getElementById('cantFeedback');
+  if (val > cantMax) {
+    inp.className = 'scan-inp er';
+    if (fb) fb.innerHTML = '<span style="color:var(--er);font-weight:700">❌ No puedes confirmar más de ' + fmtn(cantMax) + '</span>';
+  } else if (val === cantMax) {
+    inp.className = 'scan-inp ok';
+    if (fb) fb.innerHTML = '<span style="color:var(--ok);font-weight:700">✅ Cantidad completa</span>';
+  } else if (val > 0) {
+    inp.className = 'scan-inp';
+    if (fb) fb.innerHTML = '<span style="color:var(--wa)">⚠️ Cantidad parcial: ' + fmtn(cantMax - val) + ' faltantes</span>';
+  } else {
+    inp.className = 'scan-inp';
+    if (fb) fb.textContent = '';
+  }
+}
+
+// ── Teclado: Enter/Escape en input de referencia ─────────────
+function handlePickingKey(event, gKeyEnc, cantMax, idx) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    pgZonaItems(encodeURIComponent(_alZona));
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const inp = document.getElementById('scanRef');
+    const sec = document.getElementById('cantSeccion');
+    if (sec && sec.style.display !== 'none') {
+      // Ya verificada la ref — avanzar al campo cantidad
+      document.getElementById('cantConfirm')?.focus();
+      document.getElementById('cantConfirm')?.select();
+    } else if (inp && inp.className.includes('ok')) {
+      // Confirmar directo si ref OK
+      document.getElementById('cantConfirm')?.focus();
+    }
+  }
+}
+
+// ── Teclado: Enter/Escape en input de cantidad ───────────────
+function handleCantKey(event, gKeyEnc, cantMax, idx) {
+      + ' oninput="validarCantInputDA(this)" onkeydown="handleCantKeyDA(event,this)" />'
+    event.preventDefault();
+    document.getElementById('cantSeccion').style.display = 'none';
+    document.getElementById('scanRef').value = '';
+    document.getElementById('scanRef').className = 'scan-inp';
+    document.getElementById('refFeedback').textContent = '';
+    document.getElementById('scanRef')?.focus();
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    confirmarDesdeCadena(gKeyEnc, cantMax, idx);
+  }
+}
+
+// ── Confirmar desde cadena (valida ref + cantidad) ───────────
+function confirmarDesdeCadena(gKeyEnc, cantMax, idx) {
+  const refInp  = document.getElementById('scanRef');
+  const cantInp = document.getElementById('cantConfirm');
+  const sec     = document.getElementById('cantSeccion');
+  const item    = _chainItems[idx];
+  if (!item) return;
+
+  // Si la sección de cantidad no está visible → primero verificar referencia
+  if (!sec || sec.style.display === 'none') {
+    toast('Primero confirma la referencia escaneando o escribiéndola', 'wa');
+    refInp?.focus();
+    return;
+  }
+  const refVal  = (refInp?.value || '').trim().toUpperCase();
+  const refEsp  = String(item.referencia).trim().toUpperCase();
+  if (refVal !== refEsp) {
+    toast('❌ La referencia no coincide', 'er');
+    refInp?.focus();
+    return;
+  }
+  const cantVal = parseFloat(cantInp?.value) || 0;
+  if (cantVal > cantMax) {
+    toast('❌ No puedes confirmar más de ' + fmtn(cantMax), 'er');
+    cantInp?.focus();
+    return;
+  }
+  if (cantVal < 0) { toast('Cantidad inválida', 'er'); return; }
+
+  if (cantVal === cantMax) {
+    // Completo
+    procesarConfirmacionCadena(gKeyEnc, cantMax, cantMax, idx);
+  } else if (cantVal === 0) {
+    toast('Ingresa una cantidad mayor a 0', 'wa');
+    cantInp?.focus();
+  } else {
+    // Parcial — abrir modal de motivo
+    abrirMotivoModal(gKeyEnc, cantMax, cantVal, idx);
+  }
+}
+
+async function procesarConfirmacionCadena(gKeyEnc, cantMax, cantConf, idx) {
+  const gKey  = decodeURIComponent(gKeyEnc);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  if (!group) return;
+  ld('Guardando...');
+  try {
+    if (cantConf >= cantMax) {
+      // Completo
+      for (const it of group._items) {
+        await sb.from(it._tipo).update({ estado_prep:'completo', cant_alistada:it.cant_comprometida, motivo:null }).eq('id', it.id);
+        Object.assign(it, { estado_prep:'completo', cant_alistada:it.cant_comprometida, motivo:null });
+      }
+      group.estado_prep = 'completo'; group.cant_alistada_total = cantMax; group.motivo = null;
+    }
+    uld();
+    // Sincronizar en _chainItems
+    const ci = _chainItems[idx];
+    if (ci) { ci.estado_prep = 'completo'; ci.cant_alistada_total = cantMax; }
+    toast('✅ Preparado', 'ok');
+    // Auto-avanzar al siguiente pendiente
+    const nextPend = _chainItems.findIndex((it, i) => i > idx && it.estado_prep !== 'completo');
+    if (nextPend >= 0) {
+      setTimeout(() => pgPickingItem(nextPend), 400);
+    } else {
+      // Todos completos
+      setTimeout(() => {
+        toast('🎉 ¡Zona completada!', 'ok');
+        pgZonaItems(encodeURIComponent(_alZona));
+      }, 600);
+    }
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+function abrirMotivoModal(gKeyEnc, cantMax, cantConf, idx) {
+  const item = _chainItems[idx];
+  const um   = e(String(item?.um_emp || item?.um || 'UND'));
+  document.body.insertAdjacentHTML('beforeend',
+    '<div class="overlay" id="motivoModal" style="display:flex">'
+    + '<div class="modal">'
+    + '<div class="modal-hdl"></div>'
+    + '<div style="font-weight:700;font-size:15px;margin-bottom:8px">⚠️ Cantidad parcial</div>'
+    + '<div style="background:var(--wa-l);padding:10px;border-radius:8px;text-align:center;margin-bottom:12px">'
+    + 'Alistado: <strong style="font-size:18px">' + fmtn(cantConf) + '</strong> de <strong>' + fmtn(cantMax) + '</strong> ' + um
+    + '<br><span style="font-size:11px;color:var(--wa)">Faltante: ' + fmtn(cantMax - cantConf) + ' ' + um + '</span>'
+    + '</div>'
+    + '<span class="inp-label">Motivo (obligatorio)</span>'
+    + '<option value="">Selecciona motivo...</option>'
+    + '<option>Sin stock suficiente</option>'
+    + '<option>Producto dañado</option>'
+    + '<option>No ubicado</option>'
+    + '<option>Fecha vencida</option>'
+    + '<option>Error en cantidad pedida</option>'
+    + '<option>Producto en cuarentena</option>'
+    + '<option>Otro</option>'
+    + '</select>'
+    + '<input id="motivoNota" class="inp" placeholder="Nota adicional (opcional)" style="margin-top:6px"'
+    + ' onkeydown="handleMotivoKey(event)"'
+    + ' />'
+    + '<div style="display:flex;gap:8px;margin-top:12px">'
+    + '<button class="btn btn-sec" style="flex:1" onclick="cerrarMotivoModal()">Cancelar</button>'
+    + '<button class="btn btn-sec" style="flex:1" onclick="cerrarMotivoModal()">Cancelar</button>'
+    + '</div></div></div>'
+  );
+  setTimeout(() => document.getElementById('motivoSel')?.focus(), 150);
+}
+
+function cerrarMotivoModal() { document.getElementById('motivoModal')?.remove(); }
+function handleMotivoKey(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    guardarMotivoCadenaDA(document.getElementById('motivoSel'));
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    document.getElementById('motivoModal')?.remove();
+  }
+}
+function guardarMotivoCadenaDA(el) {
+  const gk  = el.dataset.gkey  || document.getElementById('motivoSel')?.dataset.gkey || '';
+  const max = parseFloat(el.dataset.max  || document.getElementById('motivoSel')?.dataset.max  || 0);
+  const conf= parseFloat(el.dataset.conf || document.getElementById('motivoSel')?.dataset.conf || 0);
+  const idx = parseInt(el.dataset.idx   || document.getElementById('motivoSel')?.dataset.idx   || 0);
+  guardarMotivoCadena(gk, max, conf, idx);
+}
+async function guardarMotivoCadena(gKeyEnc, cantMax, cantConf, idx) {
+  const motivo = document.getElementById('motivoSel')?.value;
+  const nota   = document.getElementById('motivoNota')?.value;
+  if (!motivo) { toast('Selecciona un motivo', 'wa'); return; }
+  document.getElementById('motivoModal')?.remove();
+  const gKey  = decodeURIComponent(gKeyEnc);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  if (!group) return;
+  const m = motivo + (nota ? ': ' + nota : '');
+  ld('Guardando parcial...');
+  try {
+    let remaining = cantConf;
+    for (let i = 0; i < group._items.length; i++) {
+      const it = group._items[i];
+      const isLast = i === group._items.length - 1;
+      const itQty = isLast ? remaining : Math.min(remaining, it.cant_comprometida || 0);
+      await sb.from(it._tipo).update({ estado_prep:'parcial', cant_alistada:itQty, motivo:m }).eq('id', it.id);
+      Object.assign(it, { estado_prep:'parcial', cant_alistada:itQty, motivo:m });
+      remaining = Math.max(0, remaining - itQty);
+    }
+    group.estado_prep = 'parcial'; group.cant_alistada_total = cantConf; group.motivo = m;
+    const ci = _chainItems[idx];
+    if (ci) { ci.estado_prep = 'parcial'; ci.cant_alistada_total = cantConf; ci.motivo = m; }
+    uld(); toast('⏳ Parcial registrado', 'wa');
+    const nextPend = _chainItems.findIndex((it, i) => i > idx && it.estado_prep !== 'completo');
+    if (nextPend >= 0) {
+      setTimeout(() => pgPickingItem(nextPend), 400);
+    } else {
+      setTimeout(() => pgZonaItems(encodeURIComponent(_alZona)), 600);
+    }
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+function deshacerCadenaDA(btn) { deshacerCadena(btn.dataset.gkey, parseInt(btn.dataset.idx)); }
+async function deshacerCadena(gKeyEnc, idx) {
+  const gKey  = decodeURIComponent(gKeyEnc);
+  const group = _alItems.find(i => (i.referencia+'|'+i.bodega+'|'+i._tipo) === gKey);
+  if (!group) return;
+  ld('Deshaciendo...');
+  try {
+    for (const it of group._items) {
+      await sb.from(it._tipo).update({ estado_prep:'pendiente', cant_alistada:null, motivo:null }).eq('id', it.id);
+      Object.assign(it, { estado_prep:'pendiente', cant_alistada:null, motivo:null });
+    }
+    group.estado_prep = 'pendiente'; group.cant_alistada_total = 0; group.motivo = null;
+    const ci = _chainItems[idx];
+    if (ci) { ci.estado_prep = 'pendiente'; ci.cant_alistada_total = 0; ci.motivo = null; }
+    uld(); toast('↩ Deshecho');
+    pgPickingItem(idx);
+  } catch(err) { uld(); toast('Error: ' + err.message, 'er'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TECLADO GLOBAL: Enter y Escape para navegación
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', function(e) {
+  // Solo actuar si no hay un input activo específico con su propio handler
+  const active = document.activeElement;
+  const tagName = active?.tagName?.toLowerCase();
+  const hasHandler = active?.dataset?.kbhandler;
+  if (hasHandler) return; // El input tiene su propio handler
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    // Cerrar modal abierto si hay
+    const overlay = document.querySelector('.overlay[style*="flex"]');
+    if (overlay) { overlay.remove(); return; }
+    // Cerrar búsqueda o scanner
+    const buscador = document.getElementById('buscadorOverlay');
+    if (buscador) { cerrarBuscador(); return; }
+    const scanner = document.getElementById('scanOverlay');
+    if (scanner) { cerrarEscaner(); return; }
+    // Si está en pgPickingItem, volver a lista zona
+    if (_alZona && document.getElementById('zonaTimerDisplay') && document.querySelector('.confirm-step')) {
+      pgZonaItems(encodeURIComponent(_alZona)); return;
+    }
+  }
+
+  // Enter en login
+  if (e.key === 'Enter' && tagName !== 'input' && tagName !== 'textarea' && tagName !== 'select') {
+    const btn = document.querySelector('.btn-pr:not(:disabled)');
+    if (btn && btn.offsetParent !== null) btn.click();
+  }
+});
 
 // ═══════════════════════════════════════════════════════════
 // 1. DASHBOARD DEL SUPERVISOR
